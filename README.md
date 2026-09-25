@@ -49,3 +49,31 @@ This static build does not use durable storage. Changes made in the interface ex
 ## Contribution notes
 
 The project intentionally keeps all state in memory: there is no backend, persistence layer, or live ComfyUI connection. Keep new behavior accessible, mobile-first, and compatible with reduced-motion preferences. Generated previews and uploads remain local to the current browser session.
+
+## Android APK releases
+
+The web prototype is wrapped with [Capacitor](https://capacitorjs.com/) (`net.dsect.sol`) so it installs as a native Android app. Because the prototype is fully static, the APK runs offline with no server.
+
+The `Android APK` GitHub Actions workflow (`.github/workflows/android-apk.yml`) builds APKs two ways:
+
+- **Manual:** Actions tab → "Android APK" → Run workflow → choose `experimental` (debug-signed, installs fine for testing) or `release`.
+- **Scheduled:** an `experimental` build runs automatically every Monday at 09:00 UTC.
+
+Manual `release` builds also publish a GitHub Release with the APK attached.
+
+### Signing a release build
+
+Release builds need an upload keystore stored as repository secrets:
+
+1. Generate one (keep it safe — losing it means a new app identity):
+   ```bash
+   keytool -genkeypair -v -keystore sol-release.keystore -alias sol \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Add these repository secrets (Settings → Secrets and variables → Actions):
+   - `ANDROID_KEYSTORE_BASE64` — `base64 -w0 sol-release.keystore`
+   - `ANDROID_KEYSTORE_PASSWORD`
+   - `ANDROID_KEY_ALIAS`
+   - `ANDROID_KEY_PASSWORD`
+
+Without these secrets, `release` builds fail with a clear error; `experimental` builds always work.
