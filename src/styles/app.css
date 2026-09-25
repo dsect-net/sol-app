@@ -3263,36 +3263,45 @@ html[data-drawer-dragging] .tabbar {
 .user .bubble.is-collapsed:after {
   background: linear-gradient(transparent, var(--brand) 54%);
 }
-.error-demo {
-  border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
-  background: color-mix(in srgb, var(--danger) 8%, var(--surface-elevated));
+/* Compact error banner rendered beneath a failed message. */
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 86%;
+  margin-top: 6px;
+  padding: 8px 8px 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
 }
-.retry-button {
-  display: block;
-  min-height: 34px;
-  margin: 10px 0 -4px;
-  padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
-  border-radius: 10px;
-  background: transparent;
+.error-banner > svg {
+  flex: none;
   color: var(--danger);
+}
+.error-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+.error-banner.is-retrying > svg {
+  animation: pulse 0.8s infinite;
+}
+.error-banner-retry {
+  flex: none;
+  min-height: 30px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--danger);
+  color: #fff;
   font-size: 12px;
   font-weight: 800;
 }
-.retry-button:disabled {
-  opacity: 0.55;
-}
-.error-demo .message-copy:before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: var(--danger);
-}
-.error-demo:has(.retry-button:disabled) .message-copy:before {
-  animation: pulse 0.8s infinite;
+.error-banner-retry:disabled {
+  opacity: 0.6;
 }
 .audio-bubble {
   min-width: min(225px, 70vw);

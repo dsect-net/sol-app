@@ -454,7 +454,6 @@ function Message({
                     "bubble " +
                     (message.role === "user" ? "sent-pop " : "") +
                     (message.thinking ? "thinking-demo " : "") +
-                    (message.errorState ? "error-demo " : "") +
                     (isLong && !expanded ? "is-collapsed" : ""),
                   onPointerDown: (e) => begin(e, message),
                   onPointerMove: (e) => move(e, message),
@@ -499,23 +498,36 @@ function Message({
                         },
                         children: expanded ? "Show less" : "Read more",
                       }),
-                    message.errorState &&
-                      message.errorState !== "success" &&
-                      createElement("button", {
-                        className: "retry-button",
-                        disabled: message.errorState === "retrying",
-                        onPointerDown: (e) => e.stopPropagation(),
-                        onClick: (e) => {
-                          e.stopPropagation();
-                          retryDemo(message);
-                        },
-                        children:
-                          message.errorState === "retrying"
-                            ? "Retrying…"
-                            : "Retry",
-                      }),
                   ],
                 }),
+          message.errorState &&
+            message.errorState !== "success" &&
+            createElement("div", {
+              className:
+                "error-banner" +
+                (message.errorState === "retrying" ? " is-retrying" : ""),
+              role: "alert",
+              children: [
+                createElement(Icon, { name: "alert", size: 15 }),
+                createElement("span", {
+                  className: "error-banner-text",
+                  children:
+                    message.errorState === "retrying"
+                      ? "Retrying…"
+                      : "Couldn't send that.",
+                }),
+                createElement("button", {
+                  className: "error-banner-retry",
+                  disabled: message.errorState === "retrying",
+                  onPointerDown: (e) => e.stopPropagation(),
+                  onClick: (e) => {
+                    e.stopPropagation();
+                    retryDemo(message);
+                  },
+                  children: "Retry",
+                }),
+              ],
+            }),
           message.chips &&
             createElement("div", {
               className: "quick-replies",
