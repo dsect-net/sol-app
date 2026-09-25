@@ -2256,6 +2256,17 @@ button:active {
   background: var(--surface);
   border-color: var(--border-subtle);
 }
+/* Soft fade above the composer so messages ease out as they scroll under it. */
+.composer-zone::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -26px;
+  height: 26px;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+}
 .composer {
   min-height: 56px;
   gap: var(--space-1);
@@ -2270,7 +2281,7 @@ button:active {
   box-shadow: 0 0 0 3px var(--brand-subtle);
 }
 .tabbar {
-  background: var(--header);
+  background: var(--surface);
   border-color: var(--border-subtle);
   padding: var(--space-2) var(--space-2)
     max(var(--space-2), env(safe-area-inset-bottom));
