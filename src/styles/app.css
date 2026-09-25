@@ -3512,7 +3512,7 @@ html[data-drawer-dragging] .tabbar {
   overflow: hidden;
   border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: #0e1116;
+  background: #000000;
   color: #e9edf2;
 }
 .code-head {
@@ -3567,6 +3567,25 @@ html[data-drawer-dragging] .tabbar {
   font: inherit;
   color: inherit;
 }
+/* Light theme: white code blocks with dark-tuned syntax colors. */
+html[data-theme="light"] .code-block {
+  background: #ffffff;
+  color: #23272e;
+  border-color: var(--border-subtle);
+}
+html[data-theme="light"] .code-head {
+  background: #f1f3f5;
+  border-bottom-color: var(--border-subtle);
+  color: #5b6472;
+}
+html[data-theme="light"] .code-copy {
+  background: rgba(0, 0, 0, 0.06);
+  color: #23272e;
+}
+html[data-theme="light"] .syntax-keyword { color: #0369a1; }
+html[data-theme="light"] .syntax-string { color: #047857; }
+html[data-theme="light"] .syntax-number { color: #c2410c; }
+html[data-theme="light"] .syntax-comment { color: #6b7684; }
 .bubble.is-collapsed .markdown-body {
   max-height: none;
 }
