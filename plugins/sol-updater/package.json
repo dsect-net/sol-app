@@ -1,0 +1,1 @@
+{"capacitor":{"android":{"src":"android"}},"description":"Self-update plugin for sideloaded Sol APKs (DownloadManager + package installer)","files":["src/","android/"],"license":"MIT","main":"src/index.js","name":"sol-updater","version":"0.1.0"}

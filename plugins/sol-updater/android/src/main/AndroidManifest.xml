@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Lets the app prompt the user to install the downloaded APK (Android 8+). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <!-- Serves the downloaded APK to the package installer. A separate
+             authority from the app's own FileProvider so this plugin stays
+             self-contained; merged into the app manifest at build time. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.solupdater"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/sol_updater_paths" />
+        </provider>
+    </application>
+</manifest>

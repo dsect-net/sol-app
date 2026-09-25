@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon } from "./Icon";
+import { UpdaterCard } from "./UpdaterCard";
 
 const createElement = (type, props, key) =>
   React.createElement(type, key === undefined ? props : { ...props, key });
@@ -333,6 +334,7 @@ function SettingsScreen({
           }),
         ],
       }),
+      createElement(UpdaterCard, { key: "updater" }),
     ],
   });
 }
