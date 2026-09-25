@@ -15,6 +15,10 @@ on:
     # Weekly experimental build, Mondays 09:00 UTC
     - cron: "0 9 * * 1"
 
+permissions:
+  # Needed to publish the rolling `experimental` release for in-app updates.
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -47,12 +51,47 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Build experimental (debug) APK
-        if: env.BUILD_TYPE != 'release'
+      - name: Set Android versionCode / versionName
         run: |
+          VERSION_CODE="${{ github.run_number }}"
+          VERSION_NAME="$(date -u +%Y.%m.%d)-${{ github.run_number }}"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          sed -i "s/versionCode 1/versionCode $VERSION_CODE/" android/app/build.gradle
+          sed -i "s|versionName \"1.0\"|versionName \"$VERSION_NAME\"|" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
+
+      - name: Prepare experimental signing key
+        if: env.BUILD_TYPE != 'release'
+        env:
+          EXPERIMENTAL_KEYSTORE_BASE64: ${{ secrets.EXPERIMENTAL_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$EXPERIMENTAL_KEYSTORE_BASE64" ]; then
+            echo "$EXPERIMENTAL_KEYSTORE_BASE64" | base64 -d > /tmp/sol-experimental.keystore
+            echo "HAS_EXPERIMENTAL_KEY=true" >> "$GITHUB_ENV"
+            echo "Experimental signing key ready."
+          else
+            echo "HAS_EXPERIMENTAL_KEY=false" >> "$GITHUB_ENV"
+            echo "::warning::EXPERIMENTAL_KEYSTORE_BASE64 secret is not set. Building a plain debug APK and skipping the rolling experimental release (in-app updates need a stable signing key). See README for keystore setup."
+          fi
+
+      - name: Build experimental APK
+        if: env.BUILD_TYPE != 'release'
+        env:
+          EXPERIMENTAL_KEYSTORE_PASSWORD: ${{ secrets.EXPERIMENTAL_KEYSTORE_PASSWORD }}
+          EXPERIMENTAL_KEY_ALIAS: ${{ secrets.EXPERIMENTAL_KEY_ALIAS }}
+          EXPERIMENTAL_KEY_PASSWORD: ${{ secrets.EXPERIMENTAL_KEY_PASSWORD }}
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ env.HAS_EXPERIMENTAL_KEY }}" = "true" ]; then
+            # Sign with the stable experimental key so updates install over
+            # previous builds (Android requires matching signatures).
+            EXTRA_ARGS="-Pandroid.injected.signing.store.file=/tmp/sol-experimental.keystore -Pandroid.injected.signing.store.password=$EXPERIMENTAL_KEYSTORE_PASSWORD -Pandroid.injected.signing.key.alias=$EXPERIMENTAL_KEY_ALIAS -Pandroid.injected.signing.key.password=$EXPERIMENTAL_KEY_PASSWORD"
+          fi
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          # shellcheck disable=SC2086
+          ./gradlew assembleDebug $EXTRA_ARGS
 
       - name: Build release APK
         if: env.BUILD_TYPE == 'release'
@@ -83,6 +122,32 @@ jobs:
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Prepare experimental update feed
+        if: env.BUILD_TYPE != 'release' && env.HAS_EXPERIMENTAL_KEY == 'true'
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk sol-experimental.apk
+          cat > version.json <<EOF
+          {
+            "versionCode": ${{ env.VERSION_CODE }},
+            "versionName": "${{ env.VERSION_NAME }}",
+            "apkUrl": "https://github.com/dsect-net/sol-app/releases/download/experimental/sol-experimental.apk"
+          }
+          EOF
+          cat version.json
+
+      - name: Publish rolling experimental release
+        if: env.BUILD_TYPE != 'release' && env.HAS_EXPERIMENTAL_KEY == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: experimental
+          name: Sol experimental (rolling)
+          body: |
+            Latest experimental build of Sol. The Android app checks this
+            release for in-app updates via version.json.
+          files: |
+            sol-experimental.apk
+            version.json
 
       - name: Create GitHub Release
         if: env.BUILD_TYPE == 'release' && github.event_name == 'workflow_dispatch'
