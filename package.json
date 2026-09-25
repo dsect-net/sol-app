@@ -11,15 +11,17 @@
     "cap:add-android": "cap add android"
   },
   "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/app": "^6.0.3",
+    "@capacitor/core": "^6.1.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/core": "^6.1.2"
+    "sol-updater": "file:plugins/sol-updater"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
     "@vitejs/plugin-react": "^5.0.4",
-    "vite": "^7.1.7",
     "typescript": "^5.9.2",
-    "@capacitor/cli": "^6.1.2"
+    "vite": "^7.1.7"
   }
 }

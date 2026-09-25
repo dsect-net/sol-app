@@ -77,3 +77,27 @@ Release builds need an upload keystore stored as repository secrets:
    - `ANDROID_KEY_PASSWORD`
 
 Without these secrets, `release` builds fail with a clear error; `experimental` builds always work.
+
+### In-app updates (experimental builds)
+
+The Android app has a **Check for updates** button on the Settings screen (visible only in the native app, not the web prototype). The flow:
+
+1. Each workflow run stamps the APK with `versionCode = github.run_number` and a date-based `versionName`.
+2. Signed `experimental` builds are published to a rolling GitHub Release tagged `experimental`, with the APK plus a `version.json` feed file (`versionCode`, `versionName`, `apkUrl`). The app fetches that static file directly — no API auth or rate limits.
+3. The app compares the feed's `versionCode` against the installed build (`@capacitor/app` `getInfo()`), downloads the APK with Android's `DownloadManager` (progress bar included), then fires the package installer. The download/install is handled by a small local Capacitor plugin, `plugins/sol-updater`.
+4. On first update, Android asks you to allow **"install unknown apps"** for Sol — a one-time toggle the app deep-links you to.
+
+For updates to install over the previous build, Android requires every experimental APK to be signed with the **same** key, so `experimental` builds use a dedicated keystore from repository secrets (separate from the release keystore):
+
+1. Generate one (experimental-only; not the release identity):
+   ```bash
+   keytool -genkeypair -v -keystore sol-experimental.keystore -alias sol-experimental \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Add these repository secrets (Settings → Secrets and variables → Actions):
+   - `EXPERIMENTAL_KEYSTORE_BASE64` — `base64 -w0 sol-experimental.keystore`
+   - `EXPERIMENTAL_KEYSTORE_PASSWORD`
+   - `EXPERIMENTAL_KEY_ALIAS`
+   - `EXPERIMENTAL_KEY_PASSWORD`
+
+Without these secrets, `experimental` builds still succeed as plain debug APKs (uploaded as workflow artifacts), but the rolling `experimental` release — and therefore in-app updates — is skipped with a warning.

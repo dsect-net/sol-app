@@ -4946,3 +4946,42 @@ html:not([data-theme="light"]) .user .audio-times {
     animation: none !important;
   }
 }
+
+/* In-app updater (native Android only; hidden on web) */
+.updater-card {
+  padding: 6px 0;
+}
+.updater-status {
+  cursor: default;
+}
+.updater-progress {
+  display: block;
+  height: 7px;
+  margin: 2px 16px 14px;
+  border-radius: 99px;
+  background: var(--raised);
+  overflow: hidden;
+}
+.updater-progress u {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--blue);
+  border-radius: 99px;
+  transition: width 300ms linear;
+}
+.updater-button {
+  appearance: none;
+  border: 0;
+  border-radius: 99px;
+  padding: 10px 18px;
+  margin: 4px 16px 12px;
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 14px;
+}
+.updater-button.secondary {
+  background: var(--raised);
+  color: var(--text);
+}

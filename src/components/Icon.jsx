@@ -40,6 +40,7 @@ const Icon = ({ name: l, size: t = 22 }) => {
     spark: "M12 2l1.5 6.5L20 10l-6.5 1.5L12 18l-1.5-6.5L4 10l6.5-1.5L12 2Z",
     pin: "M8 3h8l-1 6 3 3H6l3-3-1-6Zm4 9v9",
     download: "M12 3v12m0 0 5-5m-5 5-5-5M5 21h14",
+    check: "M4 12.5l5 5L20 6.5",
     forward: "m15 7 5 5-5 5M20 12H9a5 5 0 0 0-5 5",
     share: "M12 16V3m0 0L7 8m5-5 5 5M5 12v8h14v-8",
     select:
