@@ -36,7 +36,10 @@ import java.io.File;
 public class SolUpdaterPlugin extends Plugin {
 
     private static final String EVENT_PROGRESS = "downloadProgress";
-    private static final String FILE_PROVIDER_SUFFIX = ".solupdater";
+    // Reuses the FileProvider declared by the Capacitor app template
+    // (authority "<package>.fileprovider") — declaring a second provider
+    // for the same class breaks the manifest merger.
+    private static final String FILE_PROVIDER_SUFFIX = ".fileprovider";
     private static final String UPDATES_SUBDIR = "updates";
     private static final String APK_MIME = "application/vnd.android.package-archive";
 

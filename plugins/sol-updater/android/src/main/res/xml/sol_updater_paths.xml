@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<paths>
-    <!-- APKs downloaded by DownloadManager into getExternalFilesDir(DOWNLOADS)/updates/. -->
-    <external-files-path name="sol_updates" path="Download/updates/" />
-</paths>
