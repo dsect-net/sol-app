@@ -1,6 +1,6 @@
 # Sol App Prototype
 
-Sol is a mobile-first chat interface prototype built as a self-contained front-end React experience. It has no backend, database, or server actions.
+Sol is a mobile-first chat interface prototype. Chat is still a self-contained front-end demo with no backend; the **Agents** tab (below) is live and talks to the fleet on Tritium.
 
 ## Run locally
 
@@ -31,6 +31,36 @@ Create a production build with `npm run build`, then preview it with `npm run pr
 - `authToken` — bearer or session token for authenticated backend requests.
 
 Do not commit real secrets. A production implementation should inject them through a secure runtime/configuration flow rather than hard-coding them in the client bundle.
+
+## Agents tab: the fleet and its shared desk
+
+The **Agents** tab is live, not demo. It talks to the Sol gateway on Tritium at `/api/sol`
+(`quantum-os/desk/sol_gateway.py`), behind team.dsect.net's tailnet identity gate. There is no
+login and no key in this bundle: the tailnet says who you are.
+
+- **Roster:** Qubit, Reeve, Cooper and Quark, each with a state (Working, Needs you or Idle; a dot
+  and a word, never colour alone), their status line and their last action on the desk.
+- **Live desk:** a view-only stream of the fleet workstation (ws-fleet), rendered with noVNC. It
+  is connected only while an agent is open and loaded on demand, so it costs nothing at startup.
+  The workstation drops input on the view stream server-side, not just in this client.
+- **Take over / Hand back:** hub admins get the control stream, and agents are held off with
+  `409 desk_taken_over` until you hand back. A note travels with the handback.
+- **Handoffs:** when an agent calls `/handoff`, a banner appears on every tab ("Qubit needs you at
+  the desk"), and the gateway also posts it in your DM with that agent.
+- **Messages:** your DM with each agent on the Hermes relay. The author is set server-side from
+  your identity.
+
+Where the gateway lives:
+
+| build | how it reaches `/api/sol` |
+|---|---|
+| served at `https://team.dsect.net/sol/` (`npm run build:web`) | same origin |
+| Android APK (Capacitor, origin `https://localhost`) | `https://team.dsect.net/api/sol`, CORS-allowed for that origin only |
+| `npm run dev` on Tritium | opt-in proxy: `SOL_DEV_GATEWAY=http://127.0.0.1:8990 SOL_DEV_LOGIN=<you> npm run dev` (see `vite.config.js`) |
+| anything else | the tab says "Fleet not connected" |
+
+Every state change sends `X-Sol-Request: 1`, which a page on another site can only send after a
+CORS preflight, and the gateway passes preflights only for Sol's own origins.
 
 ## Persistence
 
