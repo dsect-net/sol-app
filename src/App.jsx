@@ -36,7 +36,15 @@ import {
   tokenizeMentions,
 } from "./data/prototypeData";
 import { useViewportHeight } from "./hooks/useViewportHeight";
-import { backendConfig, isDemoMode } from "./config/backend";
+import {
+  getBackendConfig,
+  saveBackendConfig,
+  isDemoMode,
+  isBackendVerified,
+  saveBackendVerified,
+  RECOMMENDED_BACKEND,
+} from "./config/backend";
+import { sendChatCompletion, fetchModels, testConnection } from "./api/chat";
 
 const createElement = (type, props, key) =>
   React.createElement(type, key === undefined ? props : { ...props, key });
@@ -60,7 +68,10 @@ function SolApp() {
     [previews, setPreviews] = useState([]),
     [generation, setGeneration] = useState(null),
     [imagePrompt, setImagePrompt] = useState(""),
-    [config, setConfig] = useState(() => ({ ...backendConfig })),
+    [config, setConfig] = useState(() => getBackendConfig()),
+    [discoveredModels, setDiscoveredModels] = useState([]),
+    [discoverState, setDiscoverState] = useState({ phase: "idle" }),
+    [testState, setTestState] = useState({ phase: "idle" }),
     [mcpConnectors, setMcpConnectors] = useState([
       { id: "codex", name: "Quantum Codex", note: "Knowledge and project files", connected: true },
       { id: "github", name: "GitHub", note: "Repositories and pull requests", connected: false },
@@ -96,6 +107,7 @@ function SolApp() {
     gesture = useRef(null),
     rubber = useRef(null),
     streamRef = useRef(null),
+    backendAbort = useRef(null),
     typingTimer = useRef(null),
     replyTimer = useRef(null),
     generationTimers = useRef([]),
@@ -123,6 +135,15 @@ function SolApp() {
     drawerGesture = useRef(null);
   let activeThread = threads.find((x) => x.id === activeId) || threads[0],
     messages = activeThread ? activeThread.messages : [];
+  // Backend connection state: demo until a base URL and model are set;
+  // "connected" only after a successful test or chat against them.
+  let demoMode = isDemoMode(config),
+    backendVerified = !demoMode && isBackendVerified(config),
+    backendStatus = demoMode
+      ? "Not connected · Demo mode"
+      : backendVerified
+        ? "Connected · " + config.model
+        : "Configured · Not tested yet";
   let threadPins = pins[activeId] || [],
     threadStars = stars[activeId] || [],
     pinnedMessages = threadPins
@@ -560,6 +581,77 @@ function SolApp() {
     overlayTrigger.current = trigger || document.activeElement;
     setOverlay(next);
   };
+  // Backend connection dialog helpers.
+  let resetBackendDialog = () => {
+    setDiscoveredModels([]);
+    setDiscoverState({ phase: "idle" });
+    setTestState({ phase: "idle" });
+  };
+  let openBackendConfig = (node) => {
+    resetBackendDialog();
+    openOverlay({ type: "config" }, node);
+  };
+  let fillRecommendedBackend = () => {
+    setConfig((current) => ({
+      ...current,
+      baseUrl: RECOMMENDED_BACKEND.baseUrl,
+      model: RECOMMENDED_BACKEND.model,
+    }));
+    resetBackendDialog();
+    haptic("light");
+  };
+  let discoverBackendModels = async () => {
+    setDiscoverState({ phase: "loading" });
+    setTestState({ phase: "idle" });
+    try {
+      let models = await fetchModels({
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+      });
+      setDiscoveredModels(models.map((item) => item.id));
+      setDiscoverState({ phase: "done", count: models.length });
+      if (models.length && !String(config.model || "").trim()) {
+        setConfig((current) => ({ ...current, model: models[0].id }));
+      }
+    } catch (error) {
+      setDiscoverState({
+        phase: "error",
+        message: error && error.message ? error.message : "Discovery failed.",
+      });
+    }
+  };
+  let testBackendConnection = async () => {
+    setTestState({ phase: "testing" });
+    try {
+      let result = await testConnection({
+        baseUrl: config.baseUrl,
+        model: config.model,
+        apiKey: config.apiKey,
+      });
+      saveBackendVerified(config);
+      setTestState({
+        phase: "ok",
+        message:
+          "Connected · " +
+          result.models.length +
+          " model" +
+          (result.models.length === 1 ? "" : "s") +
+          " listed · " +
+          result.latencyMs +
+          " ms" +
+          (String(config.model || "").trim() && !result.modelFound
+            ? " · model name not in list"
+            : ""),
+      });
+      haptic("success");
+    } catch (error) {
+      setTestState({
+        phase: "error",
+        message: error && error.message ? error.message : "Connection failed.",
+      });
+      haptic("heavy");
+    }
+  };
   useEffect(() => {
     let root = document.documentElement,
       clean = () => {
@@ -738,6 +830,9 @@ function SolApp() {
     storage.set("streaming", streamingEnabled);
   }, [streamingEnabled]);
   useEffect(() => {
+    saveBackendConfig(config);
+  }, [config]);
+  useEffect(() => {
     storage.set("haptics", haptics);
   }, [haptics]);
   useEffect(() => {
@@ -871,6 +966,10 @@ function SolApp() {
   }, [overlay && overlay.type]);
   useEffect(() => {
     if (!streamingEnabled && streamRef.current) finalizeStream(true);
+    if (!streamingEnabled && backendAbort.current) {
+      backendAbort.current.abort();
+      backendAbort.current = null;
+    }
   }, [streamingEnabled]);
   let handleScroll = () => {
     cancelLongPress();
@@ -964,6 +1063,143 @@ function SolApp() {
       startReply(text, threadId);
     }, 700);
   };
+  // Recent plain-text conversation turns for the backend API (cap ~20).
+  let historyFor = (threadId, extra = []) => {
+    let prior = (threads.find((t) => t.id === threadId) || {}).messages || [];
+    return [...prior, ...extra]
+      .filter(
+        (m) =>
+          (m.role === "user" || m.role === "assistant") &&
+          m.text &&
+          !m.image &&
+          !m.streaming &&
+          m.errorState !== "error",
+      )
+      .slice(-20)
+      .map((m) => ({ role: m.role, content: m.text }));
+  };
+  // Real backend round trip. Demo mode keeps the canned path in send().
+  let backendSend = async ({ prompt, threadId, cfg, history, retryOf = null }) => {
+    finalizeStream(true);
+    stopTyping();
+    let id = "r" + Date.now() + Math.random().toString(36).slice(2, 6),
+      useStream = streamingEnabled && !reduceMotion(),
+      controller = new AbortController();
+    backendAbort.current = controller;
+    markLatestDelivered(threadId);
+    if (retryOf) {
+      updateThread(threadId, (list) =>
+        list.map((m) => (m.id === retryOf ? { ...m, errorState: "retrying" } : m)),
+      );
+    }
+    let fail = (error) => {
+      if (backendAbort.current === controller) backendAbort.current = null;
+      setStreaming(false);
+      setTyping(false);
+      if (error && error.code === "aborted") return;
+      haptic("heavy");
+      notify("Backend error");
+      let detail =
+        error && error.message ? error.message : "The backend request failed.";
+      if (useStream) {
+        updateThread(threadId, (list) =>
+          list.filter((m) => m.id !== id),
+        );
+      }
+      if (retryOf) {
+        updateThread(threadId, (list) =>
+          list.map((m) =>
+            m.id === retryOf ? { ...m, errorState: "error", text: detail } : m,
+          ),
+        );
+      } else {
+        addAssistant(detail, threadId, {
+          errorState: "error",
+          backendRetry: { prompt, threadId },
+        });
+      }
+    };
+    try {
+      if (useStream) {
+        let at = nowIso(),
+          current = { id, threadId, full: "", timer: null };
+        setStreaming(true);
+        updateThread(threadId, (list) => [
+          ...list.filter((m) => m.id !== retryOf),
+          { id, role: "assistant", text: "", at, streaming: true },
+        ]);
+        streamRef.current = current;
+        let text = await sendChatCompletion({
+          baseUrl: cfg.baseUrl,
+          model: cfg.model,
+          apiKey: cfg.apiKey,
+          messages: history,
+          stream: true,
+          signal: controller.signal,
+          onToken: (token) => {
+            if (streamRef.current !== current) return;
+            current.full += token;
+            updateThread(threadId, (list) =>
+              list.map((m) =>
+                m.id === id ? { ...m, text: m.text + token } : m,
+              ),
+            );
+          },
+        });
+        if (streamRef.current !== current) return;
+        streamRef.current = null;
+        if (backendAbort.current === controller) backendAbort.current = null;
+        setStreaming(false);
+        updateThread(threadId, (list) =>
+          list.map((m) =>
+            m.id === id
+              ? { ...m, text: current.full || text, streaming: false }
+              : m,
+          ),
+        );
+        saveBackendVerified(cfg);
+        haptic("success");
+      } else {
+        setTyping(true);
+        let text = await sendChatCompletion({
+          baseUrl: cfg.baseUrl,
+          model: cfg.model,
+          apiKey: cfg.apiKey,
+          messages: history,
+          stream: false,
+          signal: controller.signal,
+        });
+        if (!mounted.current) return;
+        if (backendAbort.current === controller) backendAbort.current = null;
+        if (retryOf) {
+          updateThread(threadId, (list) =>
+            list.filter((m) => m.id !== retryOf),
+          );
+        }
+        saveBackendVerified(cfg);
+        haptic("success");
+        startReply(text || "The backend returned an empty reply.", threadId);
+      }
+    } catch (error) {
+      fail(error);
+    }
+  };
+  // Retry router: backend failures re-send through the client, demo ones
+  // keep the prototype retry behavior.
+  let retryMessage = (message) => {
+    if (message && message.backendRetry) {
+      let { prompt, threadId } = message.backendRetry;
+      backendSend({
+        prompt,
+        threadId,
+        cfg: getBackendConfig(),
+        history: historyFor(threadId),
+        retryOf: message.id,
+      });
+      return;
+    }
+    retryDemo(message);
+  };
   let send = () => {
     let stamp = Date.now();
     let text = draft.trim();
@@ -1028,14 +1264,28 @@ function SolApp() {
     haptic("success");
     requestAnimationFrame(() => scrollLatest(true));
     if (text) {
-      let answer = cannedReplies[replyIndex.current++ % cannedReplies.length];
-      replyTimer.current = setTimeout(
-        () => scheduleReply(answer, threadId),
-        180,
-      );
+      if (isDemoMode(config)) {
+        let answer =
+          cannedReplies[replyIndex.current++ % cannedReplies.length];
+        replyTimer.current = setTimeout(
+          () => scheduleReply(answer, threadId),
+          180,
+        );
+      } else {
+        backendSend({
+          prompt: text,
+          threadId,
+          cfg: config,
+          history: historyFor(threadId, items),
+        });
+      }
     }
   };
   let stopStream = (node) => {
+    if (backendAbort.current) {
+      backendAbort.current.abort();
+      backendAbort.current = null;
+    }
     finalizeStream(false);
     haptic("medium", node);
     notify("Response stopped");
@@ -2346,7 +2596,7 @@ function SolApp() {
                           pinned: threadPins.includes(message.id),
                           starred: threadStars.includes(message.id),
                           chooseChip,
-                          retryDemo,
+                          retryDemo: retryMessage,
                           showSender: !!(activeThread && activeThread.type !== "dm"),
                         }),
                       ],
@@ -2425,10 +2675,10 @@ function SolApp() {
               setTheme(value);
               haptic("medium");
             },
-            openConfig: (node) => openOverlay({ type: "config" }, node),
+            openConfig: openBackendConfig,
             openConnectors: (node) => openOverlay({ type: "mcp" }, node),
             openSkills: (node) => openOverlay({ type: "skills" }, node),
-            demoMode: isDemoMode,
+            backendStatus,
           }),
         ],
       }),
@@ -2841,43 +3091,159 @@ function SolApp() {
       overlay &&
         overlay.type === "config" &&
         createElement(Dialog, {
-          title: "ComfyUI integration",
+          title: "Backend connection",
           close: closeOverlay,
           type: "config",
           children: [
             createElement("p", {
-              className: "status-line demo-status",
-              children: Object.values(config).every((value) => String(value || "").trim())
-                ? "Configuration entered · Network calls remain disabled"
-                : "Demo mode · Empty fields make no network calls",
+              className:
+                "status-line " +
+                (demoMode ? "demo-status" : backendVerified ? "ok-status" : ""),
+              children: backendStatus,
             }),
-            [
-              ["apiBaseUrl", "API base URL", "https://api.example.com"],
-              ["apiKey", "API key", "Future API key"],
-              ["comfyUiHost", "ComfyUI host", "comfyui.example.net"],
-              ["comfyUiPort", "ComfyUI port", "8188"],
-              ["authToken", "Auth token", "Future bearer token"],
-            ].map(([key, label, placeholder]) =>
+            createElement("label", {
+              children: [
+                "Base URL",
+                createElement("input", {
+                  type: "text",
+                  inputMode: "url",
+                  value: config.baseUrl,
+                  onChange: (e) =>
+                    setConfig({ ...config, baseUrl: e.target.value }),
+                  placeholder: "http://host:port or http://host:port/v1",
+                  autoComplete: "off",
+                  autoCapitalize: "off",
+                  autoCorrect: "off",
+                  spellCheck: false,
+                }),
+              ],
+            }),
+            createElement("label", {
+              children: [
+                "Model",
+                createElement("div", {
+                  className: "field-row",
+                  children: [
+                    createElement("input", {
+                      type: "text",
+                      value: config.model,
+                      onChange: (e) =>
+                        setConfig({ ...config, model: e.target.value }),
+                      placeholder: "Model name",
+                      autoComplete: "off",
+                      autoCapitalize: "off",
+                      autoCorrect: "off",
+                      spellCheck: false,
+                      "aria-label": "Model name",
+                    }),
+                    createElement("button", {
+                      className: "secondary-button",
+                      disabled:
+                        discoverState.phase === "loading" ||
+                        !String(config.baseUrl || "").trim(),
+                      onClick: discoverBackendModels,
+                      children:
+                        discoverState.phase === "loading"
+                          ? "Finding…"
+                          : "Discover",
+                    }),
+                  ],
+                }),
+              ],
+            }),
+            discoveredModels.length > 0 &&
               createElement("label", {
                 children: [
-                  label,
-                  createElement("input", {
-                    type: key === "apiKey" || key === "authToken" ? "password" : "text",
-                    value: config[key],
-                    onChange: (e) => setConfig({ ...config, [key]: e.target.value }),
-                    placeholder,
-                    autoComplete: "off",
+                  "Discovered models",
+                  createElement("select", {
+                    value: discoveredModels.includes(config.model)
+                      ? config.model
+                      : "",
+                    onChange: (e) =>
+                      e.target.value &&
+                      setConfig({ ...config, model: e.target.value }),
+                    children: [
+                      createElement("option", {
+                        value: "",
+                        children: "Pick a model…",
+                      }),
+                      ...discoveredModels.map((id) =>
+                        createElement("option", { value: id, children: id }, id),
+                      ),
+                    ],
                   }),
                 ],
-              }, key),
-            ),
+              }),
+            discoverState.phase === "error" &&
+              createElement("p", {
+                className: "inline-error",
+                children:
+                  "Couldn't list models: " +
+                  discoverState.message +
+                  " Enter the name manually.",
+              }),
+            discoverState.phase === "done" &&
+              createElement("p", {
+                className: "inline-ok",
+                children:
+                  "Found " +
+                  discoverState.count +
+                  " model" +
+                  (discoverState.count === 1 ? "" : "s") +
+                  " on the backend.",
+              }),
+            createElement("label", {
+              children: [
+                "API key (optional)",
+                createElement("input", {
+                  type: "password",
+                  value: config.apiKey,
+                  onChange: (e) =>
+                    setConfig({ ...config, apiKey: e.target.value }),
+                  placeholder: "Leave empty if the backend needs no auth",
+                  autoComplete: "off",
+                }),
+              ],
+            }),
+            createElement("button", {
+              className: "secondary-button block",
+              onClick: fillRecommendedBackend,
+              children: "Use recommended Tritium settings",
+            }),
+            createElement("p", {
+              className: "dialog-note",
+              children:
+                RECOMMENDED_BACKEND.label +
+                ": fast on-device models on Scotty's home server. No account or API key needed.",
+            }),
+            createElement("button", {
+              className: "secondary-button block",
+              disabled:
+                testState.phase === "testing" ||
+                !String(config.baseUrl || "").trim(),
+              onClick: testBackendConnection,
+              children:
+                testState.phase === "testing"
+                  ? "Testing…"
+                  : "Test connection",
+            }),
+            testState.phase === "error" &&
+              createElement("p", {
+                className: "inline-error",
+                children: testState.message,
+              }),
+            testState.phase === "ok" &&
+              createElement("p", {
+                className: "inline-ok",
+                children: testState.message,
+              }),
             createElement("button", {
               className: "primary-button",
               onClick: () => {
                 closeOverlay();
-                notify("Configuration kept for this session");
+                notify("Backend settings saved");
               },
-              children: "Keep for this session",
+              children: "Save",
             }),
           ],
         }),

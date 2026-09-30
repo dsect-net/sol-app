@@ -217,7 +217,7 @@ function SettingsScreen({
   openConfig,
   openConnectors,
   openSkills,
-  demoMode,
+  backendStatus,
 }) {
   return createElement("section", {
     className: "screen content-screen " + (active ? "active" : ""),
@@ -283,13 +283,13 @@ function SettingsScreen({
               createElement("span", {
                 className: "setting-icon",
                 "aria-hidden": "true",
-                children: createElement(Icon, { name: "photo", size: 18 }),
+                children: createElement(Icon, { name: "spark", size: 18 }),
               }),
               createElement("span", {
                 children: [
-                  createElement("b", { children: "ComfyUI" }),
+                  createElement("b", { children: "Backend / Model" }),
                   createElement("small", {
-                    children: demoMode ? "Not connected · Demo mode" : "Configured",
+                    children: backendStatus,
                   }),
                 ],
               }),

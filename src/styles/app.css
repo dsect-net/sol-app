@@ -686,6 +686,62 @@ svg {
 .primary-button:disabled {
   opacity: 0.45;
 }
+.secondary-button {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 10px 16px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+  margin-top: 14px;
+  white-space: nowrap;
+}
+.secondary-button:disabled {
+  opacity: 0.45;
+}
+.secondary-button.block {
+  width: 100%;
+}
+.dialog .field-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.dialog .field-row input {
+  margin-top: 0;
+  flex: 1;
+  min-width: 0;
+}
+.dialog .field-row .secondary-button {
+  margin-top: 0;
+}
+.dialog select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  margin-top: 6px;
+}
+.inline-error {
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 10px 2px 0;
+}
+.inline-ok {
+  color: var(--success);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 10px 2px 0;
+}
+.status-line.ok-status {
+  color: var(--success);
+}
 .section-label {
   margin: 25px 5px 9px;
   color: var(--muted);

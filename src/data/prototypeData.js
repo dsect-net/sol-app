@@ -1,13 +1,58 @@
 var nowIso = () => new Date().toISOString();
 var storage = (() => {
   let memory = new Map();
+  let hasLocalStorage = (() => {
+    try {
+      return typeof localStorage !== "undefined" && localStorage !== null;
+    } catch (error) {
+      return false;
+    }
+  })();
+  let prefix = "sol.";
+  let readStored = (key) => {
+    if (!hasLocalStorage) return undefined;
+    try {
+      let raw = localStorage.getItem(prefix + key);
+      if (raw === null || raw === undefined) return undefined;
+      return JSON.parse(raw);
+    } catch (error) {
+      return undefined;
+    }
+  };
+  let writeStored = (key, value) => {
+    if (!hasLocalStorage) return;
+    try {
+      let raw = JSON.stringify(value);
+      if (raw !== undefined) localStorage.setItem(prefix + key, raw);
+    } catch (error) {
+      // Private browsing and full disks can reject writes; memory still works.
+    }
+  };
+  let clearStored = (key) => {
+    if (!hasLocalStorage) return;
+    try {
+      localStorage.removeItem(prefix + key);
+    } catch (error) {}
+  };
   return {
-    get: (key, fallback) => (memory.has(key) ? memory.get(key) : fallback),
+    get: (key, fallback) => {
+      if (memory.has(key)) return memory.get(key);
+      let stored = readStored(key);
+      if (stored !== undefined) {
+        memory.set(key, stored);
+        return stored;
+      }
+      return fallback;
+    },
     set: (key, value) => {
       memory.set(key, value);
+      writeStored(key, value);
       return value;
     },
-    remove: (key) => memory.delete(key),
+    remove: (key) => {
+      memory.delete(key);
+      clearStored(key);
+    },
   };
 })();
 var atOffset = (minutes) =>
