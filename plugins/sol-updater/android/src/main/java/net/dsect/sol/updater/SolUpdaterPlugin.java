@@ -184,7 +184,7 @@ public class SolUpdaterPlugin extends Plugin {
     }
 
     @Override
-    protected void handleOnDestroy() {
+    protected synchronized void handleOnDestroy() {
         polling = false;
         downloadId = -1;
         try {
@@ -239,10 +239,28 @@ public class SolUpdaterPlugin extends Plugin {
         }
     }
 
+    private boolean isTerminal(long id) {
+        try (Cursor c = downloadManager.query(new DownloadManager.Query().setFilterById(id))) {
+            if (c != null && c.moveToFirst()) {
+                int status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                return status == DownloadManager.STATUS_SUCCESSFUL || status == DownloadManager.STATUS_FAILED;
+            }
+        } catch (Exception ignored) {
+            // treated as not finished
+        }
+        return false;
+    }
+
     // Called by the poller and by the broadcast; synchronized so it runs once.
     private synchronized void finishDownload() {
         if (downloadId == -1) {
             return;   // already finished by the other path
+        }
+        // The receiver is exported, so any app can send ACTION_DOWNLOAD_COMPLETE with a guessed
+        // id. Only finish on a terminal status from DownloadManager itself; otherwise a forged
+        // broadcast mid-download could fail it and delete the half-written file (review).
+        if (!isTerminal(downloadId)) {
+            return;
         }
         polling = false;
         long id = downloadId;
