@@ -1,4 +1,4 @@
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, CapacitorHttp } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { SolUpdater } from "sol-updater";
 
@@ -26,10 +26,27 @@ export async function getInstalledBuild() {
   };
 }
 
-export async function checkForUpdate() {
+// GitHub's release downloads (the 302 and the asset it points to) send no CORS headers, so a
+// WebView fetch from the app's origin (https://localhost) is blocked and the check failed with
+// "Failed to fetch" on every phone. In the app the request goes through Capacitor's native HTTP,
+// which is not subject to CORS. Only here: patching fetch globally would break streamed chat.
+async function fetchFeed() {
+  if (isNativeApp()) {
+    const res = await CapacitorHttp.get({
+      url: UPDATE_FEED_URL,
+      headers: { "Cache-Control": "no-cache" },
+      responseType: "text",
+    });
+    if (res.status < 200 || res.status >= 300) throw new Error(`Update feed unavailable (HTTP ${res.status})`);
+    return typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+  }
   const res = await fetch(UPDATE_FEED_URL, { cache: "no-store" });
   if (!res.ok) throw new Error(`Update feed unavailable (HTTP ${res.status})`);
-  const feed = await res.json();
+  return res.json();
+}
+
+export async function checkForUpdate() {
+  const feed = await fetchFeed();
   const installed = await getInstalledBuild();
   const remoteCode = parseInt(feed.versionCode, 10) || 0;
   return {
