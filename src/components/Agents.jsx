@@ -319,13 +319,20 @@ function DmThread({ agent, me }) {
     [sending, setSending] = useState(false),
     [error, setError] = useState(""),
     [loaded, setLoaded] = useState(false),
+    // The gateway's answer state for this DM: {pending, seconds, error}. Agents with
+    // instant_replies are answered by the REAL agent through its Hermes API (sol_gateway.py);
+    // the others are never imitated, and the thread says when they will see it.
+    [answer, setAnswer] = useState(null),
+    [instant, setInstant] = useState(Boolean(agent.instant_replies)),
     lastId = useRef(0),
     list = useRef(null);
 
   useEffect(() => {
     let alive = true,
-      timer;
+      timer,
+      pending = false;
     lastId.current = 0;
+    setAnswer(null);
     setMessages([]);
     setLoaded(false);
     let tick = async () => {
@@ -336,12 +343,16 @@ function DmThread({ agent, me }) {
           lastId.current = r.messages[r.messages.length - 1].id;
           setMessages((m) => [...m, ...r.messages]);
         }
+        setAnswer(r.answer || null);
+        if (typeof r.instant_replies === "boolean") setInstant(r.instant_replies);
         setError("");
         setLoaded(true);
+        pending = Boolean(r.answer && r.answer.pending);
       } catch {
         if (alive) setError("Messages didn't load. Sol retries every few seconds.");
       }
-      if (alive) timer = setTimeout(tick, 3000);
+      // Faster while the agent is working on a reply, so it shows up when it lands
+      if (alive) timer = setTimeout(tick, pending ? 1500 : 3000);
     };
     tick();
     return () => {
@@ -363,6 +374,7 @@ function DmThread({ agent, me }) {
     try {
       let r = await fleet.sendDm(agent.id, text);
       setDraft("");
+      if (r.answer) setAnswer(r.answer);
       if (r.message && r.message.id > lastId.current) {
         lastId.current = r.message.id;
         setMessages((m) => [...m, r.message]);
@@ -397,9 +409,24 @@ function DmThread({ agent, me }) {
             )
           : createElement("p", {
               className: "dm-empty",
-              children: `No messages with ${agent.name} yet. They read the relay; replies land here.`,
+              children: instant
+                ? `No messages with ${agent.name} yet. ${agent.name} answers here, usually within a minute.`
+                : `No messages with ${agent.name} yet. ${agent.name} reads DMs when they next check in; replies land here.`,
             }),
       }),
+      answer && answer.pending &&
+        createElement("p", {
+          className: "dm-thinking",
+          role: "status",
+          children: [
+            createElement("span", { className: "dm-dots", "aria-hidden": "true", children: [createElement("i", {}, 1), createElement("i", {}, 2), createElement("i", {}, 3)] }),
+            `${agent.name} is thinking`,
+            // A real agent turn can take a minute or more; say so rather than look frozen
+            answer.seconds >= 20 ? ` · ${answer.seconds}s` : "",
+          ],
+        }),
+      answer && !answer.pending && answer.error &&
+        createElement("p", { className: "dm-error", role: "alert", children: answer.error }),
       error && createElement("p", { className: "dm-error", role: "alert", children: error }),
       createElement("form", {
         className: "dm-composer",
@@ -408,7 +435,7 @@ function DmThread({ agent, me }) {
           createElement("input", {
             value: draft,
             onChange: (e) => setDraft(e.target.value),
-            placeholder: `Message ${agent.name}`,
+            placeholder: instant ? `Message ${agent.name}` : `Message ${agent.name} (replies when they check in)`,
             "aria-label": `Message ${agent.name}`,
             maxLength: 2000,
           }),

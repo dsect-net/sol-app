@@ -4976,13 +4976,12 @@ html:not([data-theme="light"]) .user .audio-times {
   background: var(--soft);
 }
 .desk-card-icon {
-  width: 40px;
-  height: 40px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
-  background: var(--brand-subtle, var(--raised));
-  color: var(--brand-strong, var(--blue));
+  background: none;   /* plain icon, like the other rows (minimal pass, 2026-10-01) */
+  color: var(--muted);
 }
 .desk-card b,
 .agent-row b,
@@ -5436,4 +5435,35 @@ html:not([data-theme="light"]) .user .audio-times {
   gap: 8px;
   justify-content: center;
   margin-top: 12px;
+}
+
+/* An agent working on a reply in a DM (instant_replies agents, answered by the real agent) */
+.dm-thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.dm-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.dm-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+  animation: dm-dot 1.2s infinite;
+}
+.dm-dots i:nth-child(2) { animation-delay: 0.2s; }
+.dm-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dm-dot {
+  0%, 60%, 100% { opacity: 0.35; }
+  30% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dm-dots i { animation: none; opacity: 0.6; }
 }
