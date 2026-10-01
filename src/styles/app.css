@@ -3252,11 +3252,10 @@ html[data-drawer-dragging] .tabbar {
   right: 0;
   bottom: 0;
   height: 74px;
-  background: linear-gradient(transparent, var(--surface-elevated) 54%);
+  /* Fades into the bubble's own colour, whichever theme and side (review: it used a surface colour
+     and left a band). */
+  background: linear-gradient(transparent, var(--bubble-bg) 54%);
   pointer-events: none;
-}
-.user .bubble.is-collapsed:after {
-  background: linear-gradient(transparent, var(--user-bubble) 54%);
 }
 .bubble.is-collapsed .markdown-body {
   max-height: none;
@@ -3270,7 +3269,11 @@ html[data-drawer-dragging] .tabbar {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--brand-strong);
+  /* The bubble's own text colour, underlined: the brand blue measured 1.21:1 on a sent bubble in
+     the dark theme (review). */
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   font-size: 12px;
   font-weight: 800;
 }
@@ -4367,7 +4370,8 @@ html[data-theme="light"] .syntax-comment { color: #6b7684; }
   border-radius: 26px;
 }
 .bubble {
-  background: #e8ebef;
+  --bubble-bg: #e8ebef;   /* also what a collapsed message fades into */
+  background: var(--bubble-bg);
   color: #171a20;
   box-shadow: none;
 }
@@ -4482,7 +4486,8 @@ html[data-theme="light"] .syntax-comment { color: #6b7684; }
   font-weight: 800;
 }
 html:not([data-theme="light"]) .bubble {
-  background: #272b33;
+  --bubble-bg: #272b33;
+  background: var(--bubble-bg);
   color: #f7f8fa;
 }
 html:not([data-theme="light"]) .user .bubble {
@@ -4683,6 +4688,7 @@ html[data-theme="light"] {
 }
 .user .bubble,
 html:not([data-theme="light"]) .user .bubble {
+  --bubble-bg: var(--user-bubble);
   background: var(--user-bubble);
   color: var(--user-bubble-text);
 }

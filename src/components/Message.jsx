@@ -376,9 +376,13 @@ function Message({
   // Long replies are shown in full. More > "Collapse long messages" folds them behind Read more
   // (Scott, 2026-10-01: an option, off by default).
   let [expanded, setExpanded] = useState(false),
-    isLong =
+    // A reply you watched stream in stays open: folding it the moment it finished made the text
+    // you were reading jump away (review). Only messages that arrived whole are folded.
+    streamedHere = useRef(Boolean(message.streaming));
+  if (message.streaming) streamedHere.current = true;
+  let isLong =
       !!collapseLong &&
-      !message.streaming &&
+      !streamedHere.current &&
       ((message.text || "").length > 430 || (message.text || "").split("\n").length > 7),
     rowClass =
       "message-row " +
@@ -493,6 +497,8 @@ function Message({
                         className: "read-toggle",
                         "aria-expanded": expanded,
                         onPointerDown: (e) => e.stopPropagation(),
+                        // A long-press on the button mustn't open the message menu (review).
+                        onContextMenu: (e) => e.stopPropagation(),
                         onClick: (e) => {
                           e.stopPropagation();
                           setExpanded((x) => !x);

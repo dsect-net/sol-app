@@ -6,11 +6,12 @@ import { fleet, fleetEnabled } from "../fleet";
 const createElement = (type, props, key) =>
   React.createElement(type, key === undefined ? props : { ...props, key });
 
-function SettingToggle({ on, set, label, note, icon, disabled }) {
+function SettingToggle({ on, set, label, note, icon, disabled, describedBy }) {
   return createElement("button", {
     className: "setting-row",
     role: "switch",
     "aria-checked": on,
+    "aria-describedby": describedBy,
     disabled,
     onClick: (e) => set(!on, e.currentTarget),
     children: [
@@ -40,57 +41,67 @@ function SettingToggle({ on, set, label, note, icon, disabled }) {
 // is the same on every device; only a hub admin can change it.
 function QubitSettings({ active }) {
   let [st, setSt] = useState(null),
-    [err, setErr] = useState("");
+    [err, setErr] = useState(""),
+    [saving, setSaving] = useState(false),
+    // Bumped by every change: a slower GET that started earlier must not overwrite it (review).
+    gen = React.useRef(0);
   useEffect(() => {
     if (!active || !fleetEnabled()) return undefined;
-    let alive = true;
+    let alive = true,
+      mine = gen.current;
     fleet
       .qubitSettings()
-      .then((r) => alive && (setSt(r), setErr("")))
-      .catch(() => alive && setErr("Couldn't reach Qubit's settings."));
+      .then((r) => alive && gen.current === mine && setSt(r))
+      .catch(() => {});          // off the tailnet: no section, rather than an alert on every visit
     return () => {
       alive = false;
     };
   }, [active]);
-  if (!fleetEnabled() || (!st && !err)) return null;
+  if (!fleetEnabled() || !st) return null;
   let change = async (key, value) => {
-    let before = st;
-    setSt({ ...st, [key]: value });
+    let was = st[key];
+    gen.current += 1;
+    setSt((s) => ({ ...s, [key]: value }));
     setErr("");
+    setSaving(true);
     try {
-      setSt(await fleet.setQubitSettings({ [key]: value }));
+      let r = await fleet.setQubitSettings({ [key]: value });
+      setSt(r);
     } catch (e) {
-      setSt(before);
+      setSt((s) => ({ ...s, [key]: was }));   // only the one that failed
       setErr(e.status === 403 ? "Only a hub admin can change this." : "That didn't save. Try again.");
     }
+    setSaving(false);
   };
-  let locked = !st || !st.can_change;
+  let locked = !st.can_change || saving;
   return createElement(React.Fragment, {
     children: [
       createElement("h3", { className: "section-label", children: "Qubit" }),
-      st &&
-        createElement("div", {
-          className: "settings-card",
-          children: [
-            createElement(SettingToggle, {
-              on: Boolean(st.front_desk),
-              set: (v) => change("front_desk", v),
-              label: "Front desk",
-              note: "Quick replies right away; bigger asks go to Qubit's full brain",
-              icon: "agent",
-              disabled: locked,
-            }),
-            createElement(SettingToggle, {
-              on: Boolean(st.cloud_agents_first),
-              set: (v) => change("cloud_agents_first", v),
-              label: "Use cloud agents first",
-              note: "Helpers try Gemini first (free, rate-limited), then local",
-              icon: "cloud",
-              disabled: locked,
-            }),
-          ],
-        }),
-      st && !st.can_change && createElement("p", { className: "settings-note", children: "Only a hub admin can change these." }),
+      createElement("div", {
+        className: "settings-card",
+        children: [
+          createElement(SettingToggle, {
+            on: Boolean(st.front_desk),
+            set: (v) => change("front_desk", v),
+            label: "Front desk",
+            note: "Quick replies right away; bigger asks go to Qubit's full brain",
+            icon: "agent",
+            disabled: locked,
+            describedBy: st.can_change ? undefined : "qubit-settings-note",
+          }),
+          createElement(SettingToggle, {
+            on: Boolean(st.cloud_agents_first),
+            set: (v) => change("cloud_agents_first", v),
+            label: "Use cloud agents first",
+            note: "Helpers try Gemini first (free, rate-limited), then local",
+            icon: "cloud",
+            disabled: locked,
+            describedBy: st.can_change ? undefined : "qubit-settings-note",
+          }),
+        ],
+      }),
+      !st.can_change &&
+        createElement("p", { id: "qubit-settings-note", className: "settings-note", children: "Only a hub admin can change these." }),
       err && createElement("p", { className: "settings-error", role: "alert", children: err }),
     ],
   });
