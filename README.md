@@ -72,7 +72,7 @@ Where the gateway lives:
 |---|---|
 | served at `https://team.dsect.net/sol/` (`npm run build:web`) | same origin |
 | Android APK (Capacitor, origin `https://localhost`) | `https://team.dsect.net/api/sol`, CORS-allowed for that origin only |
-| `npm run dev` on Tritium | opt-in proxy: `SOL_DEV_GATEWAY=http://127.0.0.1:8990 SOL_DEV_LOGIN=<you> npm run dev` (see `vite.config.js`) |
+| `npm run dev` on Tritium | opt-in proxy: `SOL_DEV_GATEWAY=http://127.0.0.1:8990 SOL_DEV_LOGIN=<you> npm run dev` (see `vite.config.js`). The gateway must also accept the dev page's origin: start it with `SOL_ORIGINS=http://localhost:5173,https://team.dsect.net,https://localhost` (or your dev port), or every POST - chat included - gets 403 `csrf`. |
 | anything else | the tab says "Fleet not connected" |
 
 Every state change sends `X-Sol-Request: 1`, which a page on another site can only send after a

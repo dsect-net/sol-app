@@ -25,7 +25,7 @@ export function laneLabel(m) {
 }
 
 // GET {gatewayBase}/models -> [{id, label, lane, device, alignment, context, note, shared, up}]
-export function useLocalModels(gatewayBase, open) {
+export function useLocalModels(gatewayBase, open, nonce = 0) {
   let [state, setState] = useState({ phase: "idle", models: [] });
   useEffect(() => {
     if (!gatewayBase || !open) return undefined;
@@ -48,17 +48,39 @@ export function useLocalModels(gatewayBase, open) {
     return () => {
       alive = false;
     };
-  }, [gatewayBase, open]);
+  }, [gatewayBase, open, nonce]);
   return state;
 }
 
 export function ModelSheet({ gatewayBase, current, choose, close }) {
   let { phase, models, error } = useLocalModels(gatewayBase, true);
+  // Once the list is in, put focus on the chosen model (the dialog's own first focus lands on
+  // Close, where the arrow keys do nothing).
+  let listRef = React.useRef(null);
   useEffect(() => {
-    let onKey = (e) => e.key === "Escape" && close();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [close]);
+    if (phase !== "done" || !listRef.current) return undefined;
+    // After the overlay's own first-focus (a requestAnimationFrame): if /models answers first,
+    // that would otherwise move focus back to Close (review).
+    let raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        let el = listRef.current && listRef.current.querySelector('[role="radio"][tabindex="0"]');
+        if (el) el.focus();
+      }),
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+  // A radio group is one Tab stop; the arrow keys move between the models that are up.
+  let selectable = models.filter((m) => m.up),
+    focusId = (selectable.find((m) => m.id === current) || selectable[0] || {}).id;
+  let onKeyDown = (e) => {
+    let keys = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+    if (!(e.key in keys) || !selectable.length) return;
+    e.preventDefault();
+    let radios = [...e.currentTarget.querySelectorAll('[role="radio"]:not(:disabled)')],
+      at = radios.indexOf(document.activeElement),
+      next = at < 0 ? radios[0] : radios[(at + keys[e.key] + radios.length) % radios.length];
+    if (next) next.focus();
+  };
 
   let body;
   if (phase === "error") {
@@ -68,8 +90,10 @@ export function ModelSheet({ gatewayBase, current, choose, close }) {
   } else {
     body = createElement("div", {
       className: "model-list",
+      ref: listRef,
       role: "radiogroup",
       "aria-label": "Local models",
+      onKeyDown,
       children: models.map((m) =>
         createElement(
           "button",
@@ -77,6 +101,7 @@ export function ModelSheet({ gatewayBase, current, choose, close }) {
             type: "button",
             role: "radio",
             "aria-checked": m.id === current,
+            tabIndex: m.id === focusId ? 0 : -1,
             disabled: !m.up,
             className: "model-row" + (m.id === current ? " is-current" : ""),
             onClick: () => {
