@@ -122,7 +122,12 @@ public class SolUpdaterPlugin extends Plugin {
                 getContext(),
                 receiver,
                 new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-                ContextCompat.RECEIVER_NOT_EXPORTED);
+                // EXPORTED: ACTION_DOWNLOAD_COMPLETE is sent by the system's download provider, a
+                // different app. NOT_EXPORTED only hears this app's own broadcasts, so the
+                // completion never arrived and the UI sat at "Downloading... 100%" forever
+                // (reproduced 2026-10-01 on Android 16: DownloadManager logged SUCCESS, nothing
+                // resolved). The poller below now finishes it too, whichever comes first.
+                ContextCompat.RECEIVER_EXPORTED);
 
         polling = true;
         new Thread(this::pollProgress).start();
@@ -219,6 +224,7 @@ public class SolUpdaterPlugin extends Plugin {
                     notifyListeners(EVENT_PROGRESS, data);
                     if (status == DownloadManager.STATUS_SUCCESSFUL
                             || status == DownloadManager.STATUS_FAILED) {
+                        finishDownload();   // don't depend on the broadcast alone
                         break;
                     }
                 }
@@ -233,7 +239,11 @@ public class SolUpdaterPlugin extends Plugin {
         }
     }
 
-    private void finishDownload() {
+    // Called by the poller and by the broadcast; synchronized so it runs once.
+    private synchronized void finishDownload() {
+        if (downloadId == -1) {
+            return;   // already finished by the other path
+        }
         polling = false;
         long id = downloadId;
         downloadId = -1;

@@ -198,7 +198,9 @@ function actionButton(label, onClick, secondary) {
     {
       className: secondary ? "updater-button secondary" : "updater-button",
       onClick,
-      key: label,
+      // As props.children: this file's createElement(type, props, key) takes a KEY third, so the
+      // label passed there became the key and every updater button rendered blank.
+      children: label,
     },
     label
   );
