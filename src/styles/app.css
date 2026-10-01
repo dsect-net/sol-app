@@ -315,11 +315,6 @@ svg {
   color: #564000;
   font-size: 11px;
 }
-.cursor {
-  font-style: normal;
-  color: var(--blue);
-  animation: blink 0.7s steps(1) infinite;
-}
 .typing-bubble {
   display: flex;
   gap: 5px;
@@ -1283,11 +1278,6 @@ svg {
 @keyframes pulse {
   50% {
     opacity: 0.3;
-  }
-}
-@keyframes blink {
-  50% {
-    opacity: 0;
   }
 }
 @keyframes reaction-pop {
@@ -3246,6 +3236,48 @@ html[data-drawer-dragging] .tabbar {
 }
 .quick-replies button:disabled {
   opacity: 0.45;
+}
+
+/* "Collapse long messages" (More, off by default): a long reply folds behind Read more. */
+.bubble.is-collapsed {
+  position: relative;
+  max-height: 10.2em;
+  overflow: hidden;
+  padding-bottom: 43px;
+}
+.bubble.is-collapsed:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 74px;
+  background: linear-gradient(transparent, var(--surface-elevated) 54%);
+  pointer-events: none;
+}
+.user .bubble.is-collapsed:after {
+  background: linear-gradient(transparent, var(--user-bubble) 54%);
+}
+.bubble.is-collapsed .markdown-body {
+  max-height: none;
+}
+.read-toggle {
+  position: relative;
+  z-index: 2;
+  display: block;
+  min-height: 32px;
+  margin: 10px 0 -5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+.bubble.is-collapsed .read-toggle {
+  position: absolute;
+  left: 16px;
+  bottom: 8px;
 }
 
 /* Compact error banner rendered beneath a failed message. */

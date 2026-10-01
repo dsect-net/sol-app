@@ -72,6 +72,8 @@ function SolApp() {
       storage.get("streamReplies", false),
     ),
     [streaming, setStreaming] = useState(false),
+    // Long messages in full unless this is on (Scott, 2026-10-01: a toggle, not the default).
+    [collapseLong, setCollapseLong] = useState(() => storage.get("collapseLong", false)),
     [haptics, setHaptics] = useState(() => storage.get("haptics", true)),
     [replying, setReplying] = useState(null),
     [overlay, setOverlay] = useState(null),
@@ -901,6 +903,9 @@ function SolApp() {
   useEffect(() => {
     storage.set("streamReplies", streamingEnabled);
   }, [streamingEnabled]);
+  useEffect(() => {
+    storage.set("collapseLong", collapseLong);
+  }, [collapseLong]);
   useEffect(() => {
     saveBackendConfig(config);
   }, [config]);
@@ -2717,6 +2722,7 @@ function SolApp() {
                           chooseChip,
                           retryDemo: retryMessage,
                           showSender: !!(activeThread && activeThread.type !== "dm"),
+                          collapseLong,
                         }),
                       ],
                     },
@@ -2792,6 +2798,11 @@ function SolApp() {
             streaming: streamingEnabled,
             setStreaming: (value, node) => {
               setStreamingEnabled(value);
+              haptic("medium", node);
+            },
+            collapseLong,
+            setCollapseLong: (value, node) => {
+              setCollapseLong(value);
               haptic("medium", node);
             },
             haptics,

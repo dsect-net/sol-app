@@ -182,6 +182,8 @@ function SettingsScreen({
   active,
   streaming,
   setStreaming,
+  collapseLong,
+  setCollapseLong,
   haptics,
   setHaptics,
   theme,
@@ -217,6 +219,13 @@ function SettingsScreen({
             label: "Streaming responses",
             note: "Show replies as they arrive",
             icon: "spark",
+          }),
+          createElement(SettingToggle, {
+            on: collapseLong,
+            set: setCollapseLong,
+            label: "Collapse long messages",
+            note: "Fold long replies behind Read more",
+            icon: "collapse",
           }),
           createElement(SettingToggle, {
             on: haptics,
