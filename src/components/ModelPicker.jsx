@@ -58,9 +58,16 @@ export function ModelSheet({ gatewayBase, current, choose, close }) {
   // Close, where the arrow keys do nothing).
   let listRef = React.useRef(null);
   useEffect(() => {
-    if (phase !== "done" || !listRef.current) return;
-    let el = listRef.current.querySelector('[role="radio"][tabindex="0"]');
-    if (el) el.focus();
+    if (phase !== "done" || !listRef.current) return undefined;
+    // After the overlay's own first-focus (a requestAnimationFrame): if /models answers first,
+    // that would otherwise move focus back to Close (review).
+    let raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        let el = listRef.current && listRef.current.querySelector('[role="radio"][tabindex="0"]');
+        if (el) el.focus();
+      }),
+    );
+    return () => cancelAnimationFrame(raf);
   }, [phase]);
   // A radio group is one Tab stop; the arrow keys move between the models that are up.
   let selectable = models.filter((m) => m.up),
@@ -71,7 +78,7 @@ export function ModelSheet({ gatewayBase, current, choose, close }) {
     e.preventDefault();
     let radios = [...e.currentTarget.querySelectorAll('[role="radio"]:not(:disabled)')],
       at = radios.indexOf(document.activeElement),
-      next = radios[(at + keys[e.key] + radios.length) % radios.length];
+      next = at < 0 ? radios[0] : radios[(at + keys[e.key] + radios.length) % radios.length];
     if (next) next.focus();
   };
 

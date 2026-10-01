@@ -82,7 +82,12 @@ public class SolEdgePlugin extends Plugin {
             right = bars.right;
             bottom = ime.bottom > 0 ? 0 : bars.bottom;
             push();
-            return insets;
+            // The container already shrank by the keyboard; hand the WebView insets WITHOUT it, or
+            // a recent WebView (interactive-widget=resizes-content) shrinks again and leaves a
+            // keyboard-sized gap (review, PR #8). Bars stay, so env() keeps working.
+            return new WindowInsetsCompat.Builder(insets)
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)
+                    .build();
         });
         ViewCompat.requestApplyInsets(container);
     }

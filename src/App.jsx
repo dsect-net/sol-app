@@ -1148,11 +1148,14 @@ function SolApp() {
       .map((m) => ({ role: m.role, content: m.text }));
   };
   // Real backend round trip. Demo mode keeps the canned path in send().
-  let backendSend = async ({ prompt, threadId, cfg, history, retryOf = null }) => {
+  let backendSend = async ({ prompt, threadId, cfg, history, retryOf = null, noOverride = false }) => {
     // The thread's own model, if one was picked. `baseCfg` (the saved default) is what gets marked
     // verified: verifying the override made Settings show the default as untested (review).
     let baseCfg = cfg,
-      overridden = isGatewayUrl(cfg.baseUrl) && threadModels[threadId];
+      // noOverride: the fallback below. threadModels is this render's copy, so after dropping the
+      // override it would still name the removed model - re-sending without this flag looped
+      // forever (review, PR #9).
+      overridden = !noOverride && isGatewayUrl(cfg.baseUrl) && threadModels[threadId];
     if (overridden) cfg = { ...cfg, model: threadModels[threadId] };
     finalizeStream(true);
     stopTyping();
@@ -1176,7 +1179,8 @@ function SolApp() {
       if (overridden && error && error.apiCode === "unknown_model" && !retryOf) {
         dropThreadModel(threadId);
         notify("That model isn't available any more. Using the default.");
-        backendSend({ prompt, threadId, cfg: baseCfg, history, retryOf });
+        if (useStream) updateThread(threadId, (list) => list.filter((m) => m.id !== id));   // no empty bubble
+        backendSend({ prompt, threadId, cfg: baseCfg, history, retryOf, noOverride: true });
         return;
       }
       haptic("heavy");
