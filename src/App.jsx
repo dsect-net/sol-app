@@ -224,7 +224,10 @@ function SolApp() {
   // A request Qubit is waiting on, while this chat isn't one where its card shows: say so once.
   let toldAbout = useRef(new Set());
   useEffect(() => {
-    if (approvalsHere) return;
+    if (approvalsHere) {
+      warden.approvals.forEach((a) => toldAbout.current.add(a.id));   // seen in place: no toast later
+      return;
+    }
     let fresh = warden.approvals.filter((a) => !toldAbout.current.has(a.id));
     fresh.forEach((a) => toldAbout.current.add(a.id));
     if (fresh.length) notify(ASSISTANT.name + " needs your approval. Open a chat with " + ASSISTANT.name + ".");
