@@ -46,6 +46,7 @@ import {
   gatewayBase,
   isGatewayUrl,
   recommendedBackend,
+  autoConnect,
 } from "./config/backend";
 import { ModelSheet, laneLabel, useLocalModels } from "./components/ModelPicker";
 import { sendChatCompletion, fetchModels, testConnection } from "./api/chat";
@@ -154,6 +155,16 @@ function SolApp() {
     recordDurationRef = useRef(0),
     audioContextRef = useRef(null),
     drawerGesture = useRef(null);
+  // Connect to the Sol gateway by itself on any tailnet device (see autoConnect)
+  useEffect(() => {
+    let alive = true;
+    autoConnect().then((cfg) => {
+      if (alive && cfg) setConfig(cfg);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   let viaGateway = !isDemoMode(config) && isGatewayUrl(config.baseUrl),
     gwBase = viaGateway ? gatewayBase() || config.baseUrl.replace(/\/v1$/i, "") : "",
     localModels = useLocalModels(gwBase, viaGateway),
