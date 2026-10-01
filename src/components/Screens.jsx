@@ -1,15 +1,17 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 import { UpdaterCard } from "./UpdaterCard";
+import { fleet, fleetEnabled } from "../fleet";
 
 const createElement = (type, props, key) =>
   React.createElement(type, key === undefined ? props : { ...props, key });
 
-function SettingToggle({ on, set, label, note, icon }) {
+function SettingToggle({ on, set, label, note, icon, disabled }) {
   return createElement("button", {
     className: "setting-row",
     role: "switch",
     "aria-checked": on,
+    disabled,
     onClick: (e) => set(!on, e.currentTarget),
     children: [
       createElement("span", {
@@ -31,6 +33,65 @@ function SettingToggle({ on, set, label, note, icon }) {
           children: createElement("u", {}),
         }),
       }),
+    ],
+  });
+}
+// More > Qubit: how Qubit answers (Scott, 2026-10-01). Lives on the gateway, not in this app, so it
+// is the same on every device; only a hub admin can change it.
+function QubitSettings({ active }) {
+  let [st, setSt] = useState(null),
+    [err, setErr] = useState("");
+  useEffect(() => {
+    if (!active || !fleetEnabled()) return undefined;
+    let alive = true;
+    fleet
+      .qubitSettings()
+      .then((r) => alive && (setSt(r), setErr("")))
+      .catch(() => alive && setErr("Couldn't reach Qubit's settings."));
+    return () => {
+      alive = false;
+    };
+  }, [active]);
+  if (!fleetEnabled() || (!st && !err)) return null;
+  let change = async (key, value) => {
+    let before = st;
+    setSt({ ...st, [key]: value });
+    setErr("");
+    try {
+      setSt(await fleet.setQubitSettings({ [key]: value }));
+    } catch (e) {
+      setSt(before);
+      setErr(e.status === 403 ? "Only a hub admin can change this." : "That didn't save. Try again.");
+    }
+  };
+  let locked = !st || !st.can_change;
+  return createElement(React.Fragment, {
+    children: [
+      createElement("h3", { className: "section-label", children: "Qubit" }),
+      st &&
+        createElement("div", {
+          className: "settings-card",
+          children: [
+            createElement(SettingToggle, {
+              on: Boolean(st.front_desk),
+              set: (v) => change("front_desk", v),
+              label: "Front desk",
+              note: "Quick replies right away; bigger asks go to Qubit's full brain",
+              icon: "agent",
+              disabled: locked,
+            }),
+            createElement(SettingToggle, {
+              on: Boolean(st.cloud_agents_first),
+              set: (v) => change("cloud_agents_first", v),
+              label: "Use cloud agents first",
+              note: "Helpers try Gemini first (free, rate-limited), then local",
+              icon: "cloud",
+              disabled: locked,
+            }),
+          ],
+        }),
+      st && !st.can_change && createElement("p", { className: "settings-note", children: "Only a hub admin can change these." }),
+      err && createElement("p", { className: "settings-error", role: "alert", children: err }),
     ],
   });
 }
@@ -236,6 +297,7 @@ function SettingsScreen({
           }),
         ],
       }),
+      createElement(QubitSettings, { active }),
       createElement("h3", {
         className: "section-label",
         children: "Appearance",

@@ -3,7 +3,7 @@ import {
   BookOpen, Bot, Camera, Check, ChevronLeft, ChevronRight, Copy, Download, Ellipsis, File, Flag,
   Folder, Forward, Image, Info, Lightbulb, ListChecks, Menu, MessageCircle, Mic, Monitor, Moon,
   Pause, PenLine, Pin, Play, Plug, Plus, Reply, Search, Send, Settings, Share, Sparkles, SquarePen,
-  Star, Sun, Trash2, TriangleAlert, Users, Video, Wrench, X, Link, ChevronsDownUp,
+  Star, Sun, Trash2, TriangleAlert, Users, Video, Wrench, X, Link, ChevronsDownUp, Cloud,
 } from "lucide-react";
 
 const createElement = (type, props, key) =>
@@ -26,7 +26,7 @@ const ICONS = {
   photo: Image, image: Image, camera: Camera, video: Video, file: File, codex: BookOpen,
   plug: Plug, skill: Wrench, spark: Sparkles, pin: Pin, download: Download, check: Check,
   forward: Forward, share: Share, select: ListChecks, details: Info, alert: TriangleAlert,
-  play: Play, pause: Pause, link: Link, collapse: ChevronsDownUp,
+  play: Play, pause: Pause, link: Link, collapse: ChevronsDownUp, cloud: Cloud,
 };
 // Icons whose filled form muddles (Users' overlapping figures): active = a heavier stroke instead
 const NO_FILL = new Set(["agents", "users"]);

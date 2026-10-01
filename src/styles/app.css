@@ -5499,3 +5499,19 @@ html:not([data-theme="light"]) .user .audio-times {
 @media (prefers-reduced-motion: reduce) {
   .dm-dots i { animation: none; opacity: 0.6; }
 }
+
+/* More > Qubit (front desk, cloud agents): read-only for anyone who isn't a hub admin. */
+.setting-row:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.settings-error {
+  margin: 8px 4px 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+.settings-note {
+  margin: 8px 4px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
