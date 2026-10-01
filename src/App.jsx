@@ -178,7 +178,8 @@ function SolApp() {
     gwBase = viaGateway ? gatewayBase() || config.baseUrl.replace(/\/v1$/i, "") : "",
     localModels = useLocalModels(gwBase, viaGateway, modelsNonce),
     // The Warden's requests. Shown in a one-to-one chat with Qubit (Scott, 2026-10-01).
-    warden = useApprovals(viaGateway),
+    // Only while the chat tab is open: Qubit's DM thread (Agents tab) polls for itself (review).
+    warden = useApprovals(viaGateway && tab === "chat"),
     modelFor = (threadId) => (viaGateway && threadModels[threadId]) || config.model,
     modelInfo = (id) => localModels.models.find((m) => m.id === id),
     chooseModel = (threadId, modelId) => {
@@ -220,6 +221,14 @@ function SolApp() {
     warden.approvals.length > 0 &&
     (!activeThread || activeThread.type === "dm") &&
     modelFor(activeId) === QUBIT_MODEL;
+  // A request Qubit is waiting on, while this chat isn't one where its card shows: say so once.
+  let toldAbout = useRef(new Set());
+  useEffect(() => {
+    if (approvalsHere) return;
+    let fresh = warden.approvals.filter((a) => !toldAbout.current.has(a.id));
+    fresh.forEach((a) => toldAbout.current.add(a.id));
+    if (fresh.length) notify(ASSISTANT.name + " needs your approval. Open a chat with " + ASSISTANT.name + ".");
+  }, [warden.approvals, approvalsHere]);
   // Backend connection state: demo until a base URL and model are set;
   // "connected" only after a successful test or chat against them.
   let demoMode = isDemoMode(config),

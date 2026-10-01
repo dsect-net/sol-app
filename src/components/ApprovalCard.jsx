@@ -30,27 +30,31 @@ function iconFor(ruleKey) {
 // waits with it.
 export function useApprovals(enabled) {
   let [state, setState] = useState({ approvals: [], canDecide: false, problem: null });
-  let alive = useRef(true);
-  let load = useCallback(async () => {
+  // Bumped by each polling loop: a reply from a loop that has since stopped is dropped (review).
+  let gen = useRef(0);
+  let load = useCallback(async (mine = gen.current) => {
     try {
       let r = await fleet.approvals();
-      if (alive.current)
+      if (gen.current === mine)
         setState({ approvals: r.approvals || [], canDecide: Boolean(r.can_decide), problem: r.warden_problem || null });
     } catch {
       /* off the tailnet or not the gateway: no cards */
     }
   }, []);
   useEffect(() => {
-    alive.current = true;
-    if (!enabled || !fleetEnabled()) return undefined;
+    let mine = ++gen.current;
+    if (!enabled || !fleetEnabled()) {
+      setState((s) => (s.approvals.length ? { ...s, approvals: [] } : s));
+      return undefined;
+    }
     let timer;
     let tick = async () => {
-      if (document.visibilityState === "visible") await load();
-      if (alive.current) timer = setTimeout(tick, 2000);
+      if (document.visibilityState === "visible") await load(mine);
+      if (gen.current === mine) timer = setTimeout(tick, 2000);
     };
     tick();
     return () => {
-      alive.current = false;
+      gen.current++;
       clearTimeout(timer);
     };
   }, [enabled, load]);
@@ -136,13 +140,16 @@ export function ApprovalCard({ approval, decide, canDecide }) {
       createElement("div", {
         className: "approval-foot",
         children: [
+          // Says exactly what it would cover; not offered at all for the kinds that are asked every
+          // time (network exposure, passwords, messages as Scott, Qubit's own setup) (review).
           canDecide &&
+            approval.always_scope &&
             createElement("button", {
               type: "button",
               className: "approval-always",
               disabled: Boolean(busy) || expired,
               onClick: () => answer("always"),
-              children: "Always allow this",
+              children: "Always allow " + approval.always_scope,
             }),
           createElement("span", {
             className: "approval-time",
