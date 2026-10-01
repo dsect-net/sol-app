@@ -14,6 +14,7 @@ import {
 } from "./components/Overlays";
 import { ButtonUtility, ComposerActionButton, Icon } from "./components/Icon";
 import { Message } from "./components/Message";
+import { ApprovalStack, useApprovals } from "./components/ApprovalCard";
 import {
   GoalsScreen,
   IdeasScreen,
@@ -176,6 +177,8 @@ function SolApp() {
   let viaGateway = !isDemoMode(config) && isGatewayUrl(config.baseUrl),
     gwBase = viaGateway ? gatewayBase() || config.baseUrl.replace(/\/v1$/i, "") : "",
     localModels = useLocalModels(gwBase, viaGateway, modelsNonce),
+    // The Warden's requests. Shown in a one-to-one chat with Qubit (Scott, 2026-10-01).
+    warden = useApprovals(viaGateway),
     modelFor = (threadId) => (viaGateway && threadModels[threadId]) || config.model,
     modelInfo = (id) => localModels.models.find((m) => m.id === id),
     chooseModel = (threadId, modelId) => {
@@ -211,6 +214,12 @@ function SolApp() {
     };
   let activeThread = threads.find((x) => x.id === activeId) || threads[0],
     messages = activeThread ? activeThread.messages : [];
+  // Cards belong where Qubit itself is answering: a one-to-one chat on the gateway, model qubit.
+  let approvalsHere =
+    viaGateway &&
+    warden.approvals.length > 0 &&
+    (!activeThread || activeThread.type === "dm") &&
+    modelFor(activeId) === QUBIT_MODEL;
   // Backend connection state: demo until a base URL and model are set;
   // "connected" only after a successful test or chat against them.
   let demoMode = isDemoMode(config),
@@ -2471,7 +2480,9 @@ function SolApp() {
                                 className:
                                   "status-copy " + (typing ? "is-typing" : ""),
                                 children: typing
-                                  ? assistantName(activeId) + " is typing"
+                                  ? approvalsHere
+                                    ? "Needs approval"
+                                    : assistantName(activeId) + " is typing"
                                   : streaming
                                     ? "Responding"
                                     : activeThread && activeThread.type !== "dm"
@@ -2751,6 +2762,12 @@ function SolApp() {
                         createElement("span", {}),
                       ],
                     }),
+                  }),
+                approvalsHere &&
+                  createElement(ApprovalStack, {
+                    approvals: warden.approvals,
+                    decide: warden.decide,
+                    canDecide: warden.canDecide,
                   }),
                 generation &&
                   createElement("div", {

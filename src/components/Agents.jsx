@@ -1,3 +1,4 @@
+import { ApprovalStack, useApprovals } from "./ApprovalCard";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { ago, fleet, fleetEnabled } from "../fleet";
@@ -324,6 +325,8 @@ function DmThread({ agent, me }) {
     // the others are never imitated, and the thread says when they will see it.
     [answer, setAnswer] = useState(null),
     [instant, setInstant] = useState(Boolean(agent.instant_replies)),
+    // The Warden's requests, when this is Qubit (the only agent with one so far)
+    warden = useApprovals(agent.id === "qubit"),
     lastId = useRef(0),
     list = useRef(null),
     // poll() reschedules the next check now: after a send, the faster polling starts at once
@@ -446,6 +449,8 @@ function DmThread({ agent, me }) {
             answer.seconds >= 20 && createElement("span", { "aria-hidden": "true", children: ` · ${answer.seconds}s` }),
           ],
         }),
+      agent.id === "qubit" && warden.approvals.length > 0 &&
+        createElement(ApprovalStack, { approvals: warden.approvals, decide: warden.decide, canDecide: warden.canDecide }),
       answer && !answer.pending && answer.error &&
         createElement("p", { className: "dm-error", role: "alert", children: answer.error }),
       error && createElement("p", { className: "dm-error", role: "alert", children: error }),

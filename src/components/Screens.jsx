@@ -102,6 +102,9 @@ function QubitSettings({ active }) {
       }),
       !st.can_change &&
         createElement("p", { id: "qubit-settings-note", className: "settings-note", children: "Only a hub admin can change these." }),
+      // The Warden checks itself: its plugin, its switch in Qubit's config and its key (2026-10-01)
+      st.warden_problem &&
+        createElement("p", { className: "settings-error", role: "status", children: "Warden: " + st.warden_problem }),
       err && createElement("p", { className: "settings-error", role: "alert", children: err }),
     ],
   });
