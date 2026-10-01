@@ -65,8 +65,11 @@ function SolApp() {
     [drawerSearch, setDrawerSearch] = useState(""),
     [draft, setDraft] = useState(""),
     [typing, setTyping] = useState(false),
+    // Off by default (Scott, 2026-10-01): the typing bubble, then the whole reply at once. A new
+    // key on purpose: the old "streaming" was written on every launch, so every install already
+    // has true saved and a changed default would never reach it. More > Streaming turns it on.
     [streamingEnabled, setStreamingEnabled] = useState(() =>
-      storage.get("streaming", true),
+      storage.get("streamReplies", false),
     ),
     [streaming, setStreaming] = useState(false),
     [haptics, setHaptics] = useState(() => storage.get("haptics", true)),
@@ -896,7 +899,7 @@ function SolApp() {
     if (meta) meta.content = theme === "light" ? "#f1f1f4" : "#131315";
   }, [theme]);
   useEffect(() => {
-    storage.set("streaming", streamingEnabled);
+    storage.set("streamReplies", streamingEnabled);
   }, [streamingEnabled]);
   useEffect(() => {
     saveBackendConfig(config);
@@ -1945,7 +1948,7 @@ function SolApp() {
     haptic("light");
   };
   let demoHelp =
-    "Prototype demos:\n#thinking — thinking phases\n#typing — typing indicator\n#stream — forced streaming\n#image — image generation flow\n#code — syntax-highlighted code block\n#input — quick replies\n#reactions — reaction stack\n#reply — quoted reply\n#voice — playable voice bubble\n#link — rich link preview\n#error — retryable error\n#system — system row\n#long — collapsed long message\n#help — this list";
+    "Prototype demos:\n#thinking — thinking phases\n#typing — typing indicator\n#stream — forced streaming\n#image — image generation flow\n#code — syntax-highlighted code block\n#input — quick replies\n#reactions — reaction stack\n#reply — quoted reply\n#voice — playable voice bubble\n#link — rich link preview\n#error — retryable error\n#system — system row\n#long — long message\n#help — this list";
   let executeDemo = (raw) => {
     let name = (raw.trim().match(/^#\S+/) || ["#help"])[0].toLowerCase();
     setDraft("");
@@ -2407,10 +2410,6 @@ function SolApp() {
                                     ? activeThread.title
                                     : "Sol",
                               }),
-                              createElement("span", {
-                                className: "prototype-tag",
-                                children: "PROTOTYPE",
-                              }),
                             ],
                           }),
                           // On the gateway, a one-to-one chat shows WHICH local model is
@@ -2486,10 +2485,6 @@ function SolApp() {
                   })
                 : createElement(Fragment, {
                     children: [
-                      createElement("span", {
-                        className: "prototype-tag",
-                        children: "PROTOTYPE",
-                      }),
                       createElement(ButtonUtility, {
                         className: "round-button",
                         label:

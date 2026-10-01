@@ -2190,11 +2190,12 @@ button:active {
   height: 40px;
 }
 .mini-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: var(--brand-subtle);
-  color: var(--brand-strong);
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: none;
+  color: var(--muted);
 }
 .status {
   width: max-content;
@@ -2424,7 +2425,11 @@ button:active {
 .empty-state {
   min-height: 58%;
 }
-.empty-symbol,
+.empty-symbol {
+  width: 48px;
+  height: 48px;
+  color: var(--faint);
+}
 .sun-mark {
   width: 64px;
   height: 64px;
@@ -2484,16 +2489,17 @@ button:active {
 .setting-row:before {
   display: none;
 }
+/* Plain icons, no tinted tiles (Scott, 2026-10-01: minimalist and clean). The 24px box keeps
+   the label column aligned across rows. */
 .setting-row > .setting-icon {
-  min-width: 40px;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  border-radius: var(--radius-md);
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
   display: grid;
   place-items: center;
-  background: var(--brand-subtle);
-  color: var(--brand-strong);
+  background: none;
+  color: var(--muted);
 }
 .setting-row b {
   font-size: 14px;
@@ -3293,43 +3299,11 @@ html[data-drawer-dragging] .tabbar {
 .quick-replies button:disabled {
   opacity: 0.45;
 }
-.bubble.is-collapsed {
-  position: relative;
-  max-height: 10.2em;
-  overflow: hidden;
-  padding-bottom: 43px;
-}
-.bubble.is-collapsed:after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 74px;
-  background: linear-gradient(transparent, var(--surface-elevated) 54%);
-  pointer-events: none;
-}
-.read-toggle {
-  position: relative;
-  z-index: 2;
-  display: block;
-  min-height: 32px;
-  margin: 10px 0 -5px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--brand-strong);
-  font-size: 12px;
-  font-weight: 800;
-}
-.bubble.is-collapsed .read-toggle {
-  position: absolute;
-  left: 16px;
-  bottom: 8px;
-}
-.user .bubble.is-collapsed:after {
-  background: linear-gradient(transparent, var(--brand) 54%);
-}
+
+
+
+
+
 /* Compact error banner rendered beneath a failed message. */
 .error-banner {
   display: flex;
@@ -3662,9 +3636,7 @@ html[data-theme="light"] .syntax-keyword { color: #0369a1; }
 html[data-theme="light"] .syntax-string { color: #047857; }
 html[data-theme="light"] .syntax-number { color: #c2410c; }
 html[data-theme="light"] .syntax-comment { color: #6b7684; }
-.bubble.is-collapsed .markdown-body {
-  max-height: none;
-}
+
 .link-preview {
   width: 100%;
   display: grid;
@@ -4473,9 +4445,7 @@ html[data-theme="light"] .syntax-comment { color: #6b7684; }
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
 }
-.user .bubble.is-collapsed:after {
-  background: linear-gradient(transparent, #2563eb 54%);
-}
+
 .user .audio-bubble .audio-play {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
@@ -4780,10 +4750,7 @@ html:not([data-theme="light"]) .user .link-preview-source,
 html:not([data-theme="light"]) .user .link-preview small {
   color: #365061;
 }
-.user .bubble.is-collapsed:after,
-html:not([data-theme="light"]) .user .bubble.is-collapsed:after {
-  background: linear-gradient(transparent, var(--user-bubble) 54%);
-}
+
 .user .audio-times,
 html:not([data-theme="light"]) .user .audio-times {
   color: #385366;

@@ -17,6 +17,7 @@
     "@capacitor/app": "^6.0.3",
     "@capacitor/core": "^6.1.2",
     "@novnc/novnc": "^1.7.0",
+    "lucide-react": "^1.49.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "sol-edge": "file:plugins/sol-edge",
