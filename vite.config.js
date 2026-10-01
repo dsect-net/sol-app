@@ -26,5 +26,11 @@ export default defineConfig(({ mode }) => {
       headers: { "X-Tailnet-Login": env.SOL_DEV_LOGIN || "" },
     };
   }
-  return { plugins: [react()], server: { proxy } };
+  // Tell the bundle whether the proxy exists. Without it every /api/sol request falls through to
+  // Vite's index.html with a 200, and the Agents tab used to take that for a fleet.
+  return {
+    plugins: [react()],
+    server: { proxy },
+    define: { "import.meta.env.VITE_SOL_DEV_PROXY": JSON.stringify(gateway ? "1" : "") },
+  };
 });

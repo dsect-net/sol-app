@@ -197,7 +197,7 @@ export function AgentsScreen({ active, fleetState, open }) {
         "div",
         {
           className: "card-stack agent-list",
-          children: data.agents.map((a) =>
+          children: (Array.isArray(data.agents) ? data.agents : []).map((a) =>
             createElement(
               "button",
               {

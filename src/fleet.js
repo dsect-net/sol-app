@@ -17,7 +17,7 @@ export function solApiBase() {
   if (override) return override.replace(/\/$/, "");
   if (window.location.origin === TEAM) return "/api/sol"; // served by team.dsect.net itself
   if (isNative()) return TEAM + "/api/sol"; // the APK: https://localhost -> the tailnet host
-  if (import.meta.env.DEV) return "/api/sol"; // vite dev server proxies it
+  if (import.meta.env.DEV && import.meta.env.VITE_SOL_DEV_PROXY) return "/api/sol"; // opt-in vite proxy
   return "";
 }
 
@@ -38,11 +38,23 @@ async function call(path, { method = "GET", body } = {}) {
     cache: "no-store",
   });
   let data = {};
+  let parsed = false;
   try {
     data = await res.json();
+    parsed = data !== null && typeof data === "object";
   } catch {
     /* screenshot or empty body */
   }
+  // A 200 that isn't JSON is not the gateway: a dev server or a misrouted proxy answering with
+  // an HTML page. Taking it for an empty fleet crashed the whole app (Agents.jsx read
+  // data.agents.map of undefined, and nothing caught it).
+  if (res.ok && !parsed) {
+    const err = new Error("Something answered at the fleet address, but it isn't the Sol gateway.");
+    err.status = res.status;
+    err.code = "not_gateway";
+    throw err;
+  }
+  if (!parsed) data = {};
   if (!res.ok) {
     const err = new Error(data.detail || `The fleet didn't answer (${res.status}). Sol keeps retrying.`);
     err.status = res.status;

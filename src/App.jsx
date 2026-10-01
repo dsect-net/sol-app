@@ -46,6 +46,7 @@ import {
 } from "./config/backend";
 import { sendChatCompletion, fetchModels, testConnection } from "./api/chat";
 import { AgentSheet, AgentsScreen, HandoffBanner, useFleet } from "./components/Agents";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const createElement = (type, props, key) =>
   React.createElement(type, key === undefined ? props : { ...props, key });
@@ -2655,10 +2656,15 @@ function SolApp() {
               ],
             }),
           }),
-          createElement(AgentsScreen, {
-            active: tab === "agents",
-            fleetState,
-            open: setAgentOpen,
+          createElement(ErrorBoundary, {
+            label: "The Agents tab",
+            // The screen element must stay in the tree even after a crash, or tab switching breaks
+            quiet: tab !== "agents",
+            children: createElement(AgentsScreen, {
+              active: tab === "agents",
+              fleetState,
+              open: setAgentOpen,
+            }),
           }),
           createElement(LibraryScreen, {
             active: tab === "library",
@@ -2903,15 +2909,22 @@ function SolApp() {
           ],
         }),
       !agentOpen &&
-        createElement(HandoffBanner, {
-          data: fleetState.data,
-          open: setAgentOpen,
+        createElement(ErrorBoundary, {
+          quiet: true,
+          label: "The handoff banner",
+          children: createElement(HandoffBanner, {
+            data: fleetState.data,
+            open: setAgentOpen,
+          }),
         }),
       agentOpen &&
-        createElement(AgentSheet, {
-          agentId: agentOpen,
-          fleetState,
-          close: () => setAgentOpen(null),
+        createElement(ErrorBoundary, {
+          label: "This agent",
+          children: createElement(AgentSheet, {
+            agentId: agentOpen,
+            fleetState,
+            close: () => setAgentOpen(null),
+          }),
         }),
       createElement("nav", {
         className: "tabbar",
