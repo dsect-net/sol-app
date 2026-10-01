@@ -76,6 +76,9 @@ export const fleet = {
   // How Qubit works: {front_desk, cloud_agents_first, can_change}. Changing it is admin-only.
   qubitSettings: () => call("/qubit/settings"),
   setQubitSettings: (changes) => call("/qubit/settings", { method: "POST", body: changes }),
+  // The Warden's approval requests (hub admins see them) and the answer: once | always | deny.
+  approvals: () => call("/approvals"),
+  decideApproval: (id, choice) => call(`/approvals/${id}`, { method: "POST", body: { choice } }),
   screenshotUrl: () => `${solApiBase()}/desk/screenshot.png?t=${Date.now()}`,
   // The live desktop. `view` can only watch (the server drops input); `control` is Scott's.
   streamUrl: (mode) => {

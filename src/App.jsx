@@ -14,6 +14,7 @@ import {
 } from "./components/Overlays";
 import { ButtonUtility, ComposerActionButton, Icon } from "./components/Icon";
 import { Message } from "./components/Message";
+import { ApprovalStack, useApprovals } from "./components/ApprovalCard";
 import {
   GoalsScreen,
   IdeasScreen,
@@ -176,6 +177,9 @@ function SolApp() {
   let viaGateway = !isDemoMode(config) && isGatewayUrl(config.baseUrl),
     gwBase = viaGateway ? gatewayBase() || config.baseUrl.replace(/\/v1$/i, "") : "",
     localModels = useLocalModels(gwBase, viaGateway, modelsNonce),
+    // The Warden's requests. Shown in a one-to-one chat with Qubit (Scott, 2026-10-01).
+    // Only while the chat tab is open: Qubit's DM thread (Agents tab) polls for itself (review).
+    warden = useApprovals(viaGateway && tab === "chat"),
     modelFor = (threadId) => (viaGateway && threadModels[threadId]) || config.model,
     modelInfo = (id) => localModels.models.find((m) => m.id === id),
     chooseModel = (threadId, modelId) => {
@@ -211,6 +215,23 @@ function SolApp() {
     };
   let activeThread = threads.find((x) => x.id === activeId) || threads[0],
     messages = activeThread ? activeThread.messages : [];
+  // Cards belong where Qubit itself is answering: a one-to-one chat on the gateway, model qubit.
+  let approvalsHere =
+    viaGateway &&
+    warden.approvals.length > 0 &&
+    (!activeThread || activeThread.type === "dm") &&
+    modelFor(activeId) === QUBIT_MODEL;
+  // A request Qubit is waiting on, while this chat isn't one where its card shows: say so once.
+  let toldAbout = useRef(new Set());
+  useEffect(() => {
+    if (approvalsHere) {
+      warden.approvals.forEach((a) => toldAbout.current.add(a.id));   // seen in place: no toast later
+      return;
+    }
+    let fresh = warden.approvals.filter((a) => !toldAbout.current.has(a.id));
+    fresh.forEach((a) => toldAbout.current.add(a.id));
+    if (fresh.length) notify(ASSISTANT.name + " needs your approval. Open a chat with " + ASSISTANT.name + ".");
+  }, [warden.approvals, approvalsHere]);
   // Backend connection state: demo until a base URL and model are set;
   // "connected" only after a successful test or chat against them.
   let demoMode = isDemoMode(config),
@@ -2471,7 +2492,9 @@ function SolApp() {
                                 className:
                                   "status-copy " + (typing ? "is-typing" : ""),
                                 children: typing
-                                  ? assistantName(activeId) + " is typing"
+                                  ? approvalsHere
+                                    ? "Needs approval"
+                                    : assistantName(activeId) + " is typing"
                                   : streaming
                                     ? "Responding"
                                     : activeThread && activeThread.type !== "dm"
@@ -2751,6 +2774,12 @@ function SolApp() {
                         createElement("span", {}),
                       ],
                     }),
+                  }),
+                approvalsHere &&
+                  createElement(ApprovalStack, {
+                    approvals: warden.approvals,
+                    decide: warden.decide,
+                    canDecide: warden.canDecide,
                   }),
                 generation &&
                   createElement("div", {
