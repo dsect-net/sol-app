@@ -3,6 +3,7 @@
 // calls are made until a base URL and a model are both configured.
 
 import { storage } from "../data/prototypeData";
+import { solApiBase } from "../fleet";
 
 const STORAGE_KEY = "backend";
 const VERIFIED_KEY = "backend.verified";
@@ -21,6 +22,29 @@ export const RECOMMENDED_BACKEND = Object.freeze({
   baseUrl: "http://100.66.182.7:8088/v1",
   model: "Qwen3-4B-Instruct-2507",
 });
+
+// The Sol gateway (quantum-os/desk/sol_gateway.py) speaks the same OpenAI protocol for EVERY
+// local model on Tritium, over HTTPS behind the tailnet identity gate. Prefer it when this build
+// can reach it: an HTTPS page (team.dsect.net, or the APK at https://localhost) cannot fetch the
+// plain-http llama-server address above - browsers and WebViews block mixed content, and Android
+// blocks cleartext - and one llama-server URL only ever offers one model.
+export const GATEWAY_DEFAULT_MODEL = "Qwen3-4B-Instruct-2507";
+
+export function gatewayBase() {
+  let base = solApiBase();
+  if (!base) return "";
+  return base.startsWith("http") ? base : window.location.origin + base;
+}
+
+export function isGatewayUrl(url) {
+  return /\/api\/sol(\/v1)?$/i.test(normalizeBaseUrl(url));
+}
+
+export function recommendedBackend() {
+  let g = gatewayBase();
+  if (!g) return { ...RECOMMENDED_BACKEND, gateway: false };
+  return { label: "Tritium local AI (every model)", baseUrl: g + "/v1", model: GATEWAY_DEFAULT_MODEL, gateway: true };
+}
 
 export function normalizeBaseUrl(raw) {
   return String(raw || "").trim().replace(/\/+$/, "");

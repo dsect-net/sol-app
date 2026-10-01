@@ -1,6 +1,6 @@
 # Sol App Prototype
 
-Sol is a mobile-first chat interface prototype. Chat is still a self-contained front-end demo with no backend; the **Agents** tab (below) is live and talks to the fleet on Tritium.
+Sol is the mobile-first chat app for the local AI on Tritium. Chat talks to any of Tritium's local models through the Sol gateway (or runs as a self-contained demo until a backend is set); the **Agents** tab is live and talks to the fleet.
 
 ## Run locally
 
@@ -31,6 +31,22 @@ Create a production build with `npm run build`, then preview it with `npm run pr
 - `authToken` — bearer or session token for authenticated backend requests.
 
 Do not commit real secrets. A production implementation should inject them through a secure runtime/configuration flow rather than hard-coding them in the client bundle.
+
+## Chat with the local models (and choosing one)
+
+**More › Backend / Model › Use recommended Tritium settings** points chat at the Sol gateway
+(`<this origin>/api/sol/v1`) wherever this build can reach it - team.dsect.net, the APK, or
+`npm run dev` with `SOL_DEV_GATEWAY` set. The gateway speaks the OpenAI protocol for **every**
+local model on Tritium, over HTTPS, behind the tailnet identity gate, with no key in the app.
+
+In a one-to-one chat the header shows which model is answering (e.g. *Qwen3 4B · Fast*). Tap it
+to choose another for **that conversation**: each model's lane, the GPU it runs on, whether it is
+up, and a warning on the 35B model, which is also the agents' brain. The choice is remembered
+per chat; new chats start on the saved default.
+
+Why not straight at a llama-server (`http://100.66.182.7:8088/v1`, still the fallback when no
+gateway is reachable): an HTTPS page cannot fetch a plain-http address (mixed content), Android
+blocks cleartext by default, and one llama-server URL only ever serves one model.
 
 ## Agents tab: the fleet and its shared desk
 
