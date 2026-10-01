@@ -45,6 +45,8 @@ import {
   RECOMMENDED_BACKEND,
 } from "./config/backend";
 import { sendChatCompletion, fetchModels, testConnection } from "./api/chat";
+import { AgentSheet, AgentsScreen, HandoffBanner, useFleet } from "./components/Agents";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const createElement = (type, props, key) =>
   React.createElement(type, key === undefined ? props : { ...props, key });
@@ -96,7 +98,18 @@ function SolApp() {
     [messageQuery, setMessageQuery] = useState(""),
     [searchIndex, setSearchIndex] = useState(0),
     [recording, setRecording] = useState(null),
-    [threadLoading, setThreadLoading] = useState(false);
+    [threadLoading, setThreadLoading] = useState(false),
+    [agentOpen, setAgentOpen] = useState(null);
+  // The fleet polls fast while you're looking at it, slowly otherwise (for the handoff banner).
+  let fleetState = useFleet(tab === "agents" || Boolean(agentOpen));
+  // A new handoff is also announced (the toast is role=status), not only drawn as a banner.
+  let handoffId = fleetState.data?.desk?.handoff?.id;
+  useEffect(() => {
+    let h = fleetState.data?.desk?.handoff;
+    if (!h || h.status === "scott_has_desk") return;
+    let who = fleetState.data.agents.find((a) => a.workspace === h.bot);
+    notify(`${who ? who.name : h.bot} needs you at the desk`);
+  }, [handoffId]); // once per handoff, not on every poll
   let chatRef = useRef(null),
     contentRef = useRef(null),
     textareaRef = useRef(null),
@@ -2263,6 +2276,7 @@ function SolApp() {
     setTimeout(() => textareaRef.current && textareaRef.current.focus(), 0);
   };
   let titleMap = {
+    agents: ["Agents", "Your fleet and its shared desk"],
     library: ["Library", "Your conversations with Sol"],
     ideas: ["Ideas", "Thoughts worth returning to"],
     goals: ["Goals", "What you’re moving toward"],
@@ -2273,6 +2287,7 @@ function SolApp() {
     className: "app-shell",
     children: [
       createElement("header", {
+        inert: Boolean(agentOpen),
         className: "app-header",
         children: [
           tab === "chat"
@@ -2503,6 +2518,7 @@ function SolApp() {
       }),
       createElement("main", {
         className: "screens",
+        inert: Boolean(agentOpen),
         children: [
           createElement("section", {
             className: "screen chat-screen " + (tab === "chat" ? "active" : ""),
@@ -2640,6 +2656,16 @@ function SolApp() {
               ],
             }),
           }),
+          createElement(ErrorBoundary, {
+            label: "The Agents tab",
+            // The screen element must stay in the tree even after a crash, or tab switching breaks
+            quiet: tab !== "agents",
+            children: createElement(AgentsScreen, {
+              active: tab === "agents",
+              fleetState,
+              open: setAgentOpen,
+            }),
+          }),
           createElement(LibraryScreen, {
             active: tab === "library",
             threads,
@@ -2685,6 +2711,7 @@ function SolApp() {
       tab === "chat" &&
         createElement("div", {
           className: "composer-zone",
+          inert: Boolean(agentOpen),
           children: [
             createElement(Autocomplete, {
               picker,
@@ -2881,11 +2908,31 @@ function SolApp() {
             newCount ? createElement("b", { children: newCount }) : "Latest",
           ],
         }),
+      !agentOpen &&
+        createElement(ErrorBoundary, {
+          quiet: true,
+          label: "The handoff banner",
+          children: createElement(HandoffBanner, {
+            data: fleetState.data,
+            open: setAgentOpen,
+          }),
+        }),
+      agentOpen &&
+        createElement(ErrorBoundary, {
+          label: "This agent",
+          children: createElement(AgentSheet, {
+            agentId: agentOpen,
+            fleetState,
+            close: () => setAgentOpen(null),
+          }),
+        }),
       createElement("nav", {
         className: "tabbar",
+        inert: Boolean(agentOpen),
         "aria-label": "Main navigation",
         children: [
           ["chat", "Chat"],
+          ["agents", "Agents"],
           ["library", "Library"],
           ["ideas", "Ideas"],
           ["goals", "Goals"],

@@ -9,12 +9,14 @@
     "preview": "vite preview",
     "test": "vitest run",
     "cap:sync": "cap sync",
-    "cap:add-android": "cap add android"
+    "cap:add-android": "cap add android",
+    "build:web": "vite build --base=/sol/"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",
     "@capacitor/app": "^6.0.3",
     "@capacitor/core": "^6.1.2",
+    "@novnc/novnc": "^1.7.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "sol-updater": "file:plugins/sol-updater"

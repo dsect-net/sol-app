@@ -11,3 +11,4 @@ ios/
 
 # Local test screenshots (never commit)
 shots/
+.playwright-cli/
