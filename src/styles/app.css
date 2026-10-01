@@ -5395,3 +5395,110 @@ html:not([data-theme="light"]) .user .audio-times {
   display: grid;
   place-items: center;
 }
+
+/* ---- Model picker (TRI-017: local brains in the picker) ---------------------------------- */
+/* The header's status line, as a button, on the gateway: which local model answers this chat. */
+.model-chip {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: 2px;
+  min-height: 24px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.model-chip:hover .status-copy,
+.model-chip:focus-visible .status-copy {
+  color: var(--text);
+}
+.model-chip:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.model-list {
+  display: flex;
+  flex-direction: column;
+  margin: 4px -4px 0;
+}
+.model-row {
+  width: 100%;
+  min-height: 56px;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.model-row + .model-row {
+  margin-top: 2px;
+}
+.model-row:hover:not(:disabled),
+.model-row:focus-visible {
+  background: var(--soft);
+}
+.model-row:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+.model-row.is-current {
+  background: var(--soft);
+}
+.model-row:disabled {
+  cursor: default;
+}
+.model-row:disabled .model-row-main {
+  opacity: 0.55;
+}
+.model-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.model-row-main b {
+  font-size: 15px;
+}
+.model-row-lane {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.model-row-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.model-row-warn {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.model-row-warn svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--danger);
+}
+.model-row-state {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.model-row.is-current .model-row-state {
+  color: var(--blue);
+}

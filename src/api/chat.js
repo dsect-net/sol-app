@@ -266,6 +266,10 @@ export async function sendChatCompletion({
         headers: {
           "Content-Type": "application/json",
           ...authHeaders(apiKey),
+          // The Sol gateway refuses state changes without it (CSRF: a page on another site can
+          // only send a custom header after a CORS preflight, which only Sol's origins pass).
+          // Only sent to the gateway, so a plain llama-server sees the same request as before.
+          ...(/\/api\/sol(\/|$)/i.test(url) ? { "X-Sol-Request": "1" } : {}),
         },
         body: JSON.stringify({
           model: name,

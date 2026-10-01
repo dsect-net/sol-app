@@ -43,7 +43,12 @@ import {
   isBackendVerified,
   saveBackendVerified,
   RECOMMENDED_BACKEND,
+  gatewayBase,
+  isGatewayUrl,
+  recommendedBackend,
+  autoConnect,
 } from "./config/backend";
+import { ModelSheet, laneLabel, useLocalModels } from "./components/ModelPicker";
 import { sendChatCompletion, fetchModels, testConnection } from "./api/chat";
 import { AgentSheet, AgentsScreen, HandoffBanner, useFleet } from "./components/Agents";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -71,6 +76,10 @@ function SolApp() {
     [generation, setGeneration] = useState(null),
     [imagePrompt, setImagePrompt] = useState(""),
     [config, setConfig] = useState(() => getBackendConfig()),
+    // Per-conversation model, used when the backend is the Sol gateway (where every local
+    // model shares one URL). threadId -> model id; a missing entry means the saved default.
+    [threadModels, setThreadModels] = useState(() => storage.get("threadModels", {})),
+    [modelSheet, setModelSheet] = useState(false),
     [discoveredModels, setDiscoveredModels] = useState([]),
     [discoverState, setDiscoverState] = useState({ phase: "idle" }),
     [testState, setTestState] = useState({ phase: "idle" }),
@@ -146,6 +155,29 @@ function SolApp() {
     recordDurationRef = useRef(0),
     audioContextRef = useRef(null),
     drawerGesture = useRef(null);
+  // Connect to the Sol gateway by itself on any tailnet device (see autoConnect)
+  useEffect(() => {
+    let alive = true;
+    autoConnect().then((cfg) => {
+      if (alive && cfg) setConfig(cfg);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  let viaGateway = !isDemoMode(config) && isGatewayUrl(config.baseUrl),
+    gwBase = viaGateway ? gatewayBase() || config.baseUrl.replace(/\/v1$/i, "") : "",
+    localModels = useLocalModels(gwBase, viaGateway),
+    modelFor = (threadId) => (viaGateway && threadModels[threadId]) || config.model,
+    modelInfo = (id) => localModels.models.find((m) => m.id === id),
+    chooseModel = (threadId, modelId) => {
+      setThreadModels((cur) => {
+        let next = { ...cur, [threadId]: modelId };
+        storage.set("threadModels", next);
+        return next;
+      });
+      haptic("light");
+    };
   let activeThread = threads.find((x) => x.id === activeId) || threads[0],
     messages = activeThread ? activeThread.messages : [];
   // Backend connection state: demo until a base URL and model are set;
@@ -605,10 +637,11 @@ function SolApp() {
     openOverlay({ type: "config" }, node);
   };
   let fillRecommendedBackend = () => {
+    let rec = recommendedBackend();
     setConfig((current) => ({
       ...current,
-      baseUrl: RECOMMENDED_BACKEND.baseUrl,
-      model: RECOMMENDED_BACKEND.model,
+      baseUrl: rec.baseUrl,
+      model: rec.model,
     }));
     resetBackendDialog();
     haptic("light");
@@ -1093,6 +1126,7 @@ function SolApp() {
   };
   // Real backend round trip. Demo mode keeps the canned path in send().
   let backendSend = async ({ prompt, threadId, cfg, history, retryOf = null }) => {
+    if (isGatewayUrl(cfg.baseUrl) && threadModels[threadId]) cfg = { ...cfg, model: threadModels[threadId] };
     finalizeStream(true);
     stopTyping();
     let id = "r" + Date.now() + Math.random().toString(36).slice(2, 6),
@@ -2338,7 +2372,30 @@ function SolApp() {
                               }),
                             ],
                           }),
-                          createElement("div", {
+                          // On the gateway, a one-to-one chat shows WHICH local model is
+                          // answering, and tapping it switches models for this chat
+                          viaGateway && !typing && !streaming && (!activeThread || activeThread.type === "dm")
+                            ? createElement("button", {
+                                type: "button",
+                                className: "status model-chip",
+                                "aria-haspopup": "dialog",
+                                "aria-label": "Model: " + ((modelInfo(modelFor(activeId)) || {}).label || modelFor(activeId)) + ". Change model",
+                                onClick: () => setModelSheet(true),
+                                children: [
+                                  createElement("span", {
+                                    className: "status-dot",
+                                  }),
+                                  createElement("span", {
+                                    className: "status-copy",
+                                    children: (() => {
+                                      let m = modelInfo(modelFor(activeId));
+                                      return m ? m.label + " · " + laneLabel(m).split(" · ")[0] : modelFor(activeId);
+                                    })(),
+                                  }),
+                                  createElement(Icon, { name: "chevron", size: 14 }),
+                                ],
+                              })
+                            : createElement("div", {
                             className: "status",
                             children: [
                               createElement("span", {
@@ -2917,6 +2974,13 @@ function SolApp() {
             open: setAgentOpen,
           }),
         }),
+      modelSheet &&
+        createElement(ModelSheet, {
+          gatewayBase: gwBase,
+          current: modelFor(activeId),
+          choose: (id) => chooseModel(activeId, id),
+          close: () => setModelSheet(false),
+        }),
       agentOpen &&
         createElement(ErrorBoundary, {
           label: "This agent",
@@ -3260,7 +3324,7 @@ function SolApp() {
             createElement("p", {
               className: "dialog-note",
               children:
-                RECOMMENDED_BACKEND.label +
+                recommendedBackend().label +
                 ": fast on-device models on Scotty's home server. No account or API key needed.",
             }),
             createElement("button", {
