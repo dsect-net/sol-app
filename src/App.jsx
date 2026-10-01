@@ -80,7 +80,7 @@ function SolApp() {
     // Per-conversation model, used when the backend is the Sol gateway (where every local
     // model shares one URL). threadId -> model id; a missing entry means the saved default.
     [threadModels, setThreadModels] = useState(() => storage.get("threadModels", {})),
-    [modelSheet, setModelSheet] = useState(false),
+    [modelsNonce, setModelsNonce] = useState(0),
     [discoveredModels, setDiscoveredModels] = useState([]),
     [discoverState, setDiscoverState] = useState({ phase: "idle" }),
     [testState, setTestState] = useState({ phase: "idle" }),
@@ -168,7 +168,7 @@ function SolApp() {
   }, []);
   let viaGateway = !isDemoMode(config) && isGatewayUrl(config.baseUrl),
     gwBase = viaGateway ? gatewayBase() || config.baseUrl.replace(/\/v1$/i, "") : "",
-    localModels = useLocalModels(gwBase, viaGateway),
+    localModels = useLocalModels(gwBase, viaGateway, modelsNonce),
     modelFor = (threadId) => (viaGateway && threadModels[threadId]) || config.model,
     modelInfo = (id) => localModels.models.find((m) => m.id === id),
     chooseModel = (threadId, modelId) => {
@@ -177,7 +177,21 @@ function SolApp() {
         storage.set("threadModels", next);
         return next;
       });
+      setModelsNonce((n) => n + 1); // the header's up/down state was fetched once and went stale
       haptic("light");
+    },
+    dropThreadModel = (threadId) =>
+      setThreadModels((cur) => {
+        let next = { ...cur };
+        delete next[threadId];
+        storage.set("threadModels", next);
+        return next;
+      }),
+    chipText = (threadId) => {
+      let id = modelFor(threadId),
+        m = modelInfo(id);
+      if (!m) return id;
+      return m.label + " · " + (m.up === false ? "offline" : laneLabel(m).split(" · ")[0]);
     };
   let activeThread = threads.find((x) => x.id === activeId) || threads[0],
     messages = activeThread ? activeThread.messages : [];
@@ -643,6 +657,8 @@ function SolApp() {
       ...current,
       baseUrl: rec.baseUrl,
       model: rec.model,
+      // The gateway takes no key; a stale one broke every chat's CORS preflight (review)
+      apiKey: rec.gateway ? "" : current.apiKey,
     }));
     resetBackendDialog();
     haptic("light");
@@ -1133,7 +1149,11 @@ function SolApp() {
   };
   // Real backend round trip. Demo mode keeps the canned path in send().
   let backendSend = async ({ prompt, threadId, cfg, history, retryOf = null }) => {
-    if (isGatewayUrl(cfg.baseUrl) && threadModels[threadId]) cfg = { ...cfg, model: threadModels[threadId] };
+    // The thread's own model, if one was picked. `baseCfg` (the saved default) is what gets marked
+    // verified: verifying the override made Settings show the default as untested (review).
+    let baseCfg = cfg,
+      overridden = isGatewayUrl(cfg.baseUrl) && threadModels[threadId];
+    if (overridden) cfg = { ...cfg, model: threadModels[threadId] };
     finalizeStream(true);
     stopTyping();
     let id = "r" + Date.now() + Math.random().toString(36).slice(2, 6),
@@ -1151,6 +1171,14 @@ function SolApp() {
       setStreaming(false);
       setTyping(false);
       if (error && error.code === "aborted") return;
+      // The model this chat was set to is gone from the gateway (removed from models.json): drop
+      // the override and answer with the default instead of failing every message (review).
+      if (overridden && error && error.apiCode === "unknown_model" && !retryOf) {
+        dropThreadModel(threadId);
+        notify("That model isn't available any more. Using the default.");
+        backendSend({ prompt, threadId, cfg: baseCfg, history, retryOf });
+        return;
+      }
       haptic("heavy");
       notify("Backend error");
       let detail =
@@ -1187,6 +1215,7 @@ function SolApp() {
           baseUrl: cfg.baseUrl,
           model: cfg.model,
           apiKey: cfg.apiKey,
+          gateway: isGatewayUrl(cfg.baseUrl),
           messages: history,
           stream: true,
           signal: controller.signal,
@@ -1211,7 +1240,7 @@ function SolApp() {
               : m,
           ),
         );
-        saveBackendVerified(cfg);
+        saveBackendVerified(baseCfg);
         haptic("success");
       } else {
         setTyping(true);
@@ -1219,6 +1248,7 @@ function SolApp() {
           baseUrl: cfg.baseUrl,
           model: cfg.model,
           apiKey: cfg.apiKey,
+          gateway: isGatewayUrl(cfg.baseUrl),
           messages: history,
           stream: false,
           signal: controller.signal,
@@ -1230,7 +1260,7 @@ function SolApp() {
             list.filter((m) => m.id !== retryOf),
           );
         }
-        saveBackendVerified(cfg);
+        saveBackendVerified(baseCfg);
         haptic("success");
         startReply(text || "The backend returned an empty reply.", threadId);
       }
@@ -2386,18 +2416,16 @@ function SolApp() {
                                 type: "button",
                                 className: "status model-chip",
                                 "aria-haspopup": "dialog",
-                                "aria-label": "Model: " + ((modelInfo(modelFor(activeId)) || {}).label || modelFor(activeId)) + ". Change model",
-                                onClick: () => setModelSheet(true),
+                                // Label-in-name: the accessible name starts with the visible text
+                                "aria-label": chipText(activeId) + ", change model",
+                                onClick: (e) => openOverlay({ type: "model" }, e.currentTarget),
                                 children: [
                                   createElement("span", {
                                     className: "status-dot",
                                   }),
                                   createElement("span", {
                                     className: "status-copy",
-                                    children: (() => {
-                                      let m = modelInfo(modelFor(activeId));
-                                      return m ? m.label + " · " + laneLabel(m).split(" · ")[0] : modelFor(activeId);
-                                    })(),
+                                    children: chipText(activeId),
                                   }),
                                   createElement(Icon, { name: "chevron", size: 14 }),
                                 ],
@@ -2981,16 +3009,21 @@ function SolApp() {
             open: setAgentOpen,
           }),
         }),
-      modelSheet &&
+      // Through the overlay system like every other dialog, so it gets initial focus, the Tab
+      // trap, an inert background and focus back on the chip when it closes (review, PR #7)
+      overlay &&
+        overlay.type === "model" &&
         createElement(ModelSheet, {
           gatewayBase: gwBase,
           current: modelFor(activeId),
           choose: (id) => chooseModel(activeId, id),
-          close: () => setModelSheet(false),
+          close: closeOverlay,
         }),
       agentOpen &&
         createElement(ErrorBoundary, {
           label: "This agent",
+          overlay: true,
+          close: () => setAgentOpen(null),
           children: createElement(AgentSheet, {
             agentId: agentOpen,
             fleetState,

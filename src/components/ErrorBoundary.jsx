@@ -23,10 +23,18 @@ export class ErrorBoundary extends React.Component {
     if (this.props.quiet) return null;
     return React.createElement(
       "div",
-      { className: "empty-state compact", role: "alert" },
+      { className: "empty-state compact" + (this.props.overlay ? " boundary-overlay" : ""), role: "alert" },
       React.createElement("h2", null, `${this.props.label || "This part of Sol"} hit a problem`),
       React.createElement("p", null, "The rest of Sol still works. You can try this again."),
-      React.createElement("button", { type: "button", className: "button", onClick: this.retry }, "Try again"),
+      React.createElement(
+        "div",
+        { className: "boundary-actions" },
+        React.createElement("button", { type: "button", className: "secondary-button", onClick: this.retry }, "Try again"),
+        // An overlay that crashed still holds the rest of Sol inert; without a way to close it the
+        // only escape was a reload (review, PR #5).
+        this.props.close &&
+          React.createElement("button", { type: "button", className: "secondary-button", onClick: () => { this.setState({ error: null }); this.props.close(); } }, "Close"),
+      ),
     );
   }
 }

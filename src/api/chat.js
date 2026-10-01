@@ -14,6 +14,7 @@ export class ChatApiError extends Error {
     this.name = "ChatApiError";
     this.code = code; // config | network | timeout | aborted | http | invalid-json | stream
     this.status = options.status ?? null;
+    this.apiCode = options.apiCode ?? null; // the server's own error.code, e.g. unknown_model
   }
 }
 
@@ -81,9 +82,11 @@ function toRequestError(error) {
 
 async function toHttpError(response) {
   let detail = "";
+  let apiCode = null;
   try {
     let body = await response.clone().json();
     detail = (body && body.error && body.error.message) || "";
+    apiCode = (body && body.error && body.error.code) || null;
   } catch (error) {
     detail = "";
   }
@@ -92,7 +95,7 @@ async function toHttpError(response) {
     "The backend returned HTTP " +
       response.status +
       (detail ? ": " + detail : "."),
-    { status: response.status },
+    { status: response.status, apiCode },
   );
 }
 
@@ -249,6 +252,7 @@ export async function sendChatCompletion({
   signal = null,
   stream = false,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  gateway = false, // the Sol gateway: send its CSRF header, never an API key (review, PR #7)
 } = {}) {
   let url = normalizeBaseUrl(baseUrl);
   let name = String(model || "").trim();
@@ -265,11 +269,11 @@ export async function sendChatCompletion({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...authHeaders(apiKey),
-          // The Sol gateway refuses state changes without it (CSRF: a page on another site can
-          // only send a custom header after a CORS preflight, which only Sol's origins pass).
-          // Only sent to the gateway, so a plain llama-server sees the same request as before.
-          ...(/\/api\/sol(\/|$)/i.test(url) ? { "X-Sol-Request": "1" } : {}),
+          // The Sol gateway refuses state changes without X-Sol-Request (CSRF: a page on another
+          // site can only send a custom header after a CORS preflight, which only Sol's origins
+          // pass), and it takes no key - identity is the tailnet. A plain llama-server sees the
+          // same request as before.
+          ...(gateway ? { "X-Sol-Request": "1" } : authHeaders(apiKey)),
         },
         body: JSON.stringify({
           model: name,

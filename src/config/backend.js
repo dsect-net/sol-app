@@ -36,8 +36,14 @@ export function gatewayBase() {
   return base.startsWith("http") ? base : window.location.origin + base;
 }
 
+// Compared with gatewayBase() itself, not a URL pattern: VITE_SOL_API can put the gateway at any
+// address, and a pattern match then missed it - no picker, no CSRF header, every chat 403 (review).
+// The /api/sol pattern stays as a fallback for a saved gateway URL from another origin.
 export function isGatewayUrl(url) {
-  return /\/api\/sol(\/v1)?$/i.test(normalizeBaseUrl(url));
+  let u = normalizeBaseUrl(url).replace(/\/v1$/i, "");
+  if (!u) return false;
+  let g = normalizeBaseUrl(gatewayBase());
+  return (g && u === g) || /\/api\/sol$/i.test(u);
 }
 
 export function recommendedBackend() {

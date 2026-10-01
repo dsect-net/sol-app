@@ -5513,3 +5513,23 @@ html:not([data-theme="light"]) .user .audio-times {
 .model-row.is-current .model-row-state {
   color: var(--blue);
 }
+
+/* An overlay (the agent sheet) that crashed: its fallback sits where the sheet was, with a way out */
+.boundary-overlay {
+  position: fixed;
+  left: 50%;
+  bottom: max(var(--space-3, 16px), var(--safe-bottom));
+  transform: translateX(-50%);
+  width: min(92vw, 420px);
+  z-index: 60;
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+.boundary-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}

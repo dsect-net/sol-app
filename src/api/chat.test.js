@@ -326,3 +326,54 @@ describe("fetchModels / testConnection", () => {
     expect(error.code).toBe("network");
   });
 });
+
+describe("sendChatCompletion through the Sol gateway", () => {
+  let capture = (reply) => {
+    let seen = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url, options) => {
+        seen.url = url;
+        seen.headers = options.headers;
+        return reply;
+      }),
+    );
+    return seen;
+  };
+  let ok = () => jsonResponse({ choices: [{ message: { content: "ok" } }] });
+  let base = {
+    baseUrl: "https://team.dsect.net/api/sol/v1",
+    model: "gemma-4-E4B-it",
+    messages: [{ role: "user", content: "hi" }],
+    stream: false,
+  };
+
+  it("sends the CSRF header and never an API key to the gateway", async () => {
+    let seen = capture(ok());
+    await sendChatCompletion({ ...base, apiKey: "stale-key", gateway: true });
+    expect(seen.url).toBe("https://team.dsect.net/api/sol/v1/chat/completions");
+    expect(seen.headers["X-Sol-Request"]).toBe("1");
+    expect(seen.headers.Authorization).toBeUndefined();
+  });
+
+  it("sends the key and no CSRF header to a plain backend", async () => {
+    let seen = capture(ok());
+    await sendChatCompletion({ ...base, baseUrl: "http://host:8088/v1", apiKey: "k", gateway: false });
+    expect(seen.headers["X-Sol-Request"]).toBeUndefined();
+    expect(seen.headers.Authorization).toBe("Bearer k");
+  });
+
+  it("carries the server's error code, so Sol can fall back from a removed model", async () => {
+    capture(
+      jsonResponse(
+        { error: { message: "No such local model: 'x'.", code: "unknown_model" } },
+        { ok: false, status: 404 },
+      ),
+    );
+    let err = await sendChatCompletion({ ...base, gateway: true }).catch((e) => e);
+    expect(err).toBeInstanceOf(ChatApiError);
+    expect(err.status).toBe(404);
+    expect(err.apiCode).toBe("unknown_model");
+    expect(err.message).toContain("No such local model");
+  });
+});
