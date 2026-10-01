@@ -1,0 +1,1 @@
+{"capacitor":{"android":{"src":"android"}},"description":"Edge-to-edge Sol: draw behind the system bars and hand the page the real insets (camera cutout, gesture bar, keyboard)","files":["src/","android/"],"license":"MIT","main":"src/index.js","name":"sol-edge","version":"0.1.0"}
