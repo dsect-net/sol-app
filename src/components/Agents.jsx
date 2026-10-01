@@ -340,12 +340,14 @@ function DmThread({ agent, me }) {
   useEffect(() => {
     let alive = true,
       timer,
+      inFlight = false,
       pending = false;
     lastId.current = 0;
     setAnswer(null);
     setMessages([]);
     setLoaded(false);
     let tick = async () => {
+      inFlight = true;
       try {
         let r = await fleet.dm(agent.id, lastId.current);
         if (!alive) return;
@@ -361,13 +363,17 @@ function DmThread({ agent, me }) {
       } catch {
         if (alive) setError("Messages didn't load. Sol retries every few seconds.");
       }
+      inFlight = false;
       // Faster while the agent is working on a reply, so it shows up when it lands
       if (alive) timer = setTimeout(tick, pending ? 1500 : 3000);
     };
     poll.current = () => {
       pending = true;
+      // A poll on the wire reschedules itself when it lands; starting another here would leave
+      // two loops running (review).
+      if (inFlight || !alive) return;
       clearTimeout(timer);
-      if (alive) timer = setTimeout(tick, 1500);
+      timer = setTimeout(tick, 1500);
     };
     tick();
     return () => {
