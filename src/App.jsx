@@ -21,6 +21,7 @@ import {
   SettingsScreen,
 } from "./components/Screens";
 import {
+  ASSISTANT,
   cannedReplies,
   dayKey,
   dayLabel,
@@ -47,6 +48,7 @@ import {
   isGatewayUrl,
   recommendedBackend,
   autoConnect,
+  QUBIT_MODEL,
 } from "./config/backend";
 import { ModelSheet, laneLabel, useLocalModels } from "./components/ModelPicker";
 import { sendChatCompletion, fetchModels, testConnection } from "./api/chat";
@@ -72,6 +74,8 @@ function SolApp() {
       storage.get("streamReplies", false),
     ),
     [streaming, setStreaming] = useState(false),
+    // Long messages in full unless this is on (Scott, 2026-10-01: a toggle, not the default).
+    [collapseLong, setCollapseLong] = useState(() => storage.get("collapseLong", false)),
     [haptics, setHaptics] = useState(() => storage.get("haptics", true)),
     [replying, setReplying] = useState(null),
     [overlay, setOverlay] = useState(null),
@@ -190,6 +194,15 @@ function SolApp() {
         storage.set("threadModels", next);
         return next;
       }),
+    // Who is answering in a one-to-one chat. Qubit, unless this chat was pointed at a bare local
+    // model on the gateway: then it's that model, by name - never a model calling itself Qubit.
+    assistantName = (threadId) => {
+      // Demo mode is Qubit's demo; any real backend that isn't Qubit answers under its own name.
+      let id = isDemoMode(config) ? "" : viaGateway ? modelFor(threadId) : config.model;
+      if (!id || id === QUBIT_MODEL) return ASSISTANT.name;
+      let m = modelInfo(id);
+      return (m && m.label) || id;
+    },
     chipText = (threadId) => {
       let id = modelFor(threadId),
         m = modelInfo(id);
@@ -406,7 +419,7 @@ function SolApp() {
     ];
     thread.messages.forEach((m) => {
       let sender =
-          m.role === "assistant" ? "Sol" : m.role === "user" ? "You" : "System",
+          m.role === "assistant" ? assistantName(thread.id) : m.role === "user" ? "You" : "System",
         stamp = new Date(m.at).toLocaleString();
       lines.push("## " + sender + " — " + stamp);
       if (m.reply) lines.push("> " + m.reply.replace(/\n/g, "\n> "), "");
@@ -901,6 +914,9 @@ function SolApp() {
   useEffect(() => {
     storage.set("streamReplies", streamingEnabled);
   }, [streamingEnabled]);
+  useEffect(() => {
+    storage.set("collapseLong", collapseLong);
+  }, [collapseLong]);
   useEffect(() => {
     saveBackendConfig(config);
   }, [config]);
@@ -1561,7 +1577,7 @@ function SolApp() {
       });
     }
     if (action === "forward") {
-      let sender = message.role === "assistant" ? "Sol" : "You",
+      let sender = message.role === "assistant" ? assistantName(activeId) : "You",
         body = text || "[Image]";
       setDraft(
         "Forwarded from " + sender + ":\n> " + body.replace(/\n/g, "\n> "),
@@ -1570,7 +1586,7 @@ function SolApp() {
       notify("Ready to forward");
     }
     if (action === "export-markdown") {
-      let sender = message.role === "assistant" ? "Sol" : "You",
+      let sender = message.role === "assistant" ? assistantName(activeId) : "You",
         body =
           "# Message from " +
           sender +
@@ -1786,17 +1802,16 @@ function SolApp() {
       participants =
         kind === "group"
           ? [
-              { name: "Sol", initials: "S", color: "#f5b34f" },
-              { name: "Ava Chen", initials: "AC", color: "#68b7ff" },
+              ASSISTANT,
+              { name: "Ava Chen", initials: "AC", color: "#9d8cff" },
               { name: "Marcus Webb", initials: "MW", color: "#63d6a2" },
             ]
           : kind === "a2a"
             ? [
-                { name: "Qubit", initials: "Q", color: "#68b7ff" },
+                ASSISTANT,
                 { name: "Ion", initials: "I", color: "#9d8cff" },
-                { name: "Sol", initials: "S", color: "#f5b34f" },
               ]
-            : [{ name: "Sol", initials: "S", color: "#f5b34f" }],
+            : [ASSISTANT],
       title = kind === "group" ? "New group" : kind === "a2a" ? "New A2A chat" : "New conversation",
       starter =
         kind === "group"
@@ -2014,7 +2029,7 @@ function SolApp() {
     }
     if (name === "#stream") {
       forceDemoStream(
-        "Here’s a longer streaming response to show how Sol can reveal an answer at a measured pace while keeping the conversation readable. The animation is intentionally calm, and it works even when the regular streaming preference is turned off.",
+        "Here’s a longer streaming response to show how Qubit can reveal an answer at a measured pace while keeping the conversation readable. The animation is intentionally calm, and it works even when the regular streaming preference is turned off.",
       );
       return;
     }
@@ -2059,7 +2074,7 @@ function SolApp() {
     }
     if (name === "#link") {
       addAssistant(
-        "This is how Sol can keep a useful source close to the conversation: **clear context**, a short summary, and a direct path to the original.",
+        "This is how Qubit can keep a useful source close to the conversation: **clear context**, a short summary, and a direct path to the original.",
         activeRef.current,
         {
           linkPreview: {
@@ -2367,7 +2382,7 @@ function SolApp() {
   };
   let titleMap = {
     agents: ["Agents", "Your fleet and its shared desk"],
-    library: ["Library", "Your conversations with Sol"],
+    library: ["Library", "Your conversations with Qubit"],
     ideas: ["Ideas", "Thoughts worth returning to"],
     goals: ["Goals", "What you’re moving toward"],
     more: ["More", "Settings and preferences"],
@@ -2408,7 +2423,7 @@ function SolApp() {
                           })
                         : createElement("div", {
                             className: "avatar",
-                            children: "S",
+                            children: assistantName(activeId).slice(0, 1).toUpperCase(),
                           }),
                       createElement("div", {
                         className: "identity-copy",
@@ -2420,7 +2435,7 @@ function SolApp() {
                                 children:
                                   activeThread && activeThread.type !== "dm"
                                     ? activeThread.title
-                                    : "Sol",
+                                    : assistantName(activeId),
                               }),
                             ],
                           }),
@@ -2456,7 +2471,7 @@ function SolApp() {
                                 className:
                                   "status-copy " + (typing ? "is-typing" : ""),
                                 children: typing
-                                  ? "Sol is typing"
+                                  ? assistantName(activeId) + " is typing"
                                   : streaming
                                     ? "Responding"
                                     : activeThread && activeThread.type !== "dm"
@@ -2582,7 +2597,7 @@ function SolApp() {
                             createElement("b", {
                               children:
                                 m.role === "assistant"
-                                  ? "Sol"
+                                  ? assistantName(activeId)
                                   : m.role === "user"
                                     ? "You"
                                     : "System",
@@ -2651,7 +2666,7 @@ function SolApp() {
                     children: [
                       createElement("div", {
                         className: "sun-mark",
-                        children: "S",
+                        children: ASSISTANT.initials,
                       }),
                       createElement("h2", { children: "What’s on your mind?" }),
                       createElement("p", {
@@ -2717,6 +2732,7 @@ function SolApp() {
                           chooseChip,
                           retryDemo: retryMessage,
                           showSender: !!(activeThread && activeThread.type !== "dm"),
+                          collapseLong,
                         }),
                       ],
                     },
@@ -2726,7 +2742,7 @@ function SolApp() {
                 typing &&
                   createElement("div", {
                     className: "message-row assistant entering grouped-top",
-                    "aria-label": "Sol is typing",
+                    "aria-label": assistantName(activeId) + " is typing",
                     children: createElement("div", {
                       className: "bubble typing-bubble",
                       children: [
@@ -2794,6 +2810,11 @@ function SolApp() {
               setStreamingEnabled(value);
               haptic("medium", node);
             },
+            collapseLong,
+            setCollapseLong: (value, node) => {
+              setCollapseLong(value);
+              haptic("medium", node);
+            },
             haptics,
             setHaptics: (value, node) => {
               setHaptics(value);
@@ -2831,7 +2852,7 @@ function SolApp() {
                       createElement("b", {
                         children: [
                           "Replying to ",
-                          replying.role === "assistant" ? "Sol" : "you",
+                          replying.role === "assistant" ? assistantName(activeId) : "you",
                         ],
                       }),
                       replying.text && replying.text.slice(0, 90),
@@ -2963,7 +2984,7 @@ function SolApp() {
                           rows: 1,
                           value: draft,
                           placeholder: "Message — use @, /, or #",
-                          "aria-label": "Message Sol",
+                          "aria-label": "Message " + assistantName(activeId),
                           "aria-autocomplete": "list",
                           "aria-expanded": !!(picker && pickerItems.length),
                           "aria-controls":
@@ -3119,8 +3140,8 @@ function SolApp() {
             createElement("div", {
               className: "choice-list",
               children: [
-                ["dm", "chat", "Direct message", "A one-to-one conversation with Sol"],
-                ["group", "users", "Group chat", "You, Sol, and mock collaborators"],
+                ["dm", "chat", "Direct message", "A one-to-one conversation with Qubit"],
+                ["group", "users", "Group chat", "You, Qubit, and mock collaborators"],
                 ["a2a", "agent", "A2A chat", "A shared channel for mock agents"],
               ].map(([kind, icon, label, note]) =>
                 createElement("button", {

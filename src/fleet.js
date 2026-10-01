@@ -73,6 +73,9 @@ export const fleet = {
   dismiss: () => call("/desk/dismiss", { method: "POST", body: {} }),
   dm: (agentId, since = 0) => call(`/dm/${agentId}?since=${since}`),
   sendDm: (agentId, text) => call(`/dm/${agentId}`, { method: "POST", body: { text } }),
+  // How Qubit works: {front_desk, cloud_agents_first, can_change}. Changing it is admin-only.
+  qubitSettings: () => call("/qubit/settings"),
+  setQubitSettings: (changes) => call("/qubit/settings", { method: "POST", body: changes }),
   screenshotUrl: () => `${solApiBase()}/desk/screenshot.png?t=${Date.now()}`,
   // The live desktop. `view` can only watch (the server drops input); `control` is Scott's.
   streamUrl: (mode) => {

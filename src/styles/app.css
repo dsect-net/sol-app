@@ -154,8 +154,9 @@ svg {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, #ffdb7d, #f5a84d);
-  color: #44290e;
+  /* Qubit's blue (it was Sol's sun: the assistant is Qubit now). */
+  background: linear-gradient(145deg, #a6d8ff, #5aa7f0);
+  color: #0d2a44;
   font-weight: 900;
   font-size: 18px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
@@ -315,11 +316,6 @@ svg {
   color: #564000;
   font-size: 11px;
 }
-.cursor {
-  font-style: normal;
-  color: var(--blue);
-  animation: blink 0.7s steps(1) infinite;
-}
 .typing-bubble {
   display: flex;
   gap: 5px;
@@ -376,8 +372,8 @@ svg {
   border-radius: 22px;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, #ffdc83, #f3a64b);
-  color: #4b2b0b;
+  background: linear-gradient(145deg, #a6d8ff, #5aa7f0);
+  color: #0d2a44;
   font-size: 25px;
   font-weight: 900;
 }
@@ -1283,11 +1279,6 @@ svg {
 @keyframes pulse {
   50% {
     opacity: 0.3;
-  }
-}
-@keyframes blink {
-  50% {
-    opacity: 0;
   }
 }
 @keyframes reaction-pop {
@@ -3248,6 +3239,51 @@ html[data-drawer-dragging] .tabbar {
   opacity: 0.45;
 }
 
+/* "Collapse long messages" (More, off by default): a long reply folds behind Read more. */
+.bubble.is-collapsed {
+  position: relative;
+  max-height: 10.2em;
+  overflow: hidden;
+  padding-bottom: 43px;
+}
+.bubble.is-collapsed:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 74px;
+  /* Fades into the bubble's own colour, whichever theme and side (review: it used a surface colour
+     and left a band). */
+  background: linear-gradient(transparent, var(--bubble-bg) 54%);
+  pointer-events: none;
+}
+.bubble.is-collapsed .markdown-body {
+  max-height: none;
+}
+.read-toggle {
+  position: relative;
+  z-index: 2;
+  display: block;
+  min-height: 32px;
+  margin: 10px 0 -5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  /* The bubble's own text colour, underlined: the brand blue measured 1.21:1 on a sent bubble in
+     the dark theme (review). */
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.bubble.is-collapsed .read-toggle {
+  position: absolute;
+  left: 16px;
+  bottom: 8px;
+}
+
 /* Compact error banner rendered beneath a failed message. */
 .error-banner {
   display: flex;
@@ -4335,7 +4371,8 @@ html[data-theme="light"] .syntax-comment { color: #6b7684; }
   border-radius: 26px;
 }
 .bubble {
-  background: #e8ebef;
+  --bubble-bg: #e8ebef;   /* also what a collapsed message fades into */
+  background: var(--bubble-bg);
   color: #171a20;
   box-shadow: none;
 }
@@ -4450,7 +4487,8 @@ html[data-theme="light"] .syntax-comment { color: #6b7684; }
   font-weight: 800;
 }
 html:not([data-theme="light"]) .bubble {
-  background: #272b33;
+  --bubble-bg: #272b33;
+  background: var(--bubble-bg);
   color: #f7f8fa;
 }
 html:not([data-theme="light"]) .user .bubble {
@@ -4651,6 +4689,7 @@ html[data-theme="light"] {
 }
 .user .bubble,
 html:not([data-theme="light"]) .user .bubble {
+  --bubble-bg: var(--user-bubble);
   background: var(--user-bubble);
   color: var(--user-bubble-text);
 }
@@ -5466,4 +5505,20 @@ html:not([data-theme="light"]) .user .audio-times {
 }
 @media (prefers-reduced-motion: reduce) {
   .dm-dots i { animation: none; opacity: 0.6; }
+}
+
+/* More > Qubit (front desk, cloud agents): read-only for anyone who isn't a hub admin. */
+.setting-row:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.settings-error {
+  margin: 8px 4px 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+.settings-note {
+  margin: 8px 4px 0;
+  color: var(--muted);
+  font-size: 13px;
 }

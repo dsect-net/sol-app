@@ -371,8 +371,20 @@ function Message({
   chooseChip,
   retryDemo,
   showSender,
+  collapseLong,
 }) {
-  let rowClass =
+  // Long replies are shown in full. More > "Collapse long messages" folds them behind Read more
+  // (Scott, 2026-10-01: an option, off by default).
+  let [expanded, setExpanded] = useState(false),
+    // A reply you watched stream in stays open: folding it the moment it finished made the text
+    // you were reading jump away (review). Only messages that arrived whole are folded.
+    streamedHere = useRef(Boolean(message.streaming));
+  if (message.streaming) streamedHere.current = true;
+  let isLong =
+      !!collapseLong &&
+      !streamedHere.current &&
+      ((message.text || "").length > 430 || (message.text || "").split("\n").length > 7),
+    rowClass =
       "message-row " +
       message.role +
       " entering " +
@@ -402,7 +414,7 @@ function Message({
       showSender && message.role === "assistant" && !groupedTop &&
         createElement("span", {
           className: "message-sender",
-          children: message.sender || "Sol",
+          children: message.sender || "Qubit",
         }),
       createElement("div", {
         className: "bubble-wrap",
@@ -449,7 +461,8 @@ function Message({
                   className:
                     "bubble " +
                     (message.role === "user" ? "sent-pop " : "") +
-                    (message.thinking ? "thinking-demo " : ""),
+                    (message.thinking ? "thinking-demo " : "") +
+                    (isLong && !expanded ? "is-collapsed" : ""),
                   onPointerDown: (e) => begin(e, message),
                   onPointerMove: (e) => move(e, message),
                   onPointerUp: (e) => end(e, message),
@@ -477,11 +490,20 @@ function Message({
                         preview: message.linkPreview,
                         url: previewUrl,
                       }),
-                    message.streaming &&
-                      createElement("i", {
-                        className: "cursor",
-                        "aria-hidden": "true",
-                        children: "▍",
+                    // No blinking caret, even while a reply streams in (Scott, 2026-10-01).
+                    isLong &&
+                      createElement("button", {
+                        type: "button",
+                        className: "read-toggle",
+                        "aria-expanded": expanded,
+                        onPointerDown: (e) => e.stopPropagation(),
+                        // A long-press on the button mustn't open the message menu (review).
+                        onContextMenu: (e) => e.stopPropagation(),
+                        onClick: (e) => {
+                          e.stopPropagation();
+                          setExpanded((x) => !x);
+                        },
+                        children: expanded ? "Show less" : "Read more",
                       }),
                   ],
                 }),

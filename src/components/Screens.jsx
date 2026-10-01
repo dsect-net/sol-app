@@ -1,15 +1,18 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 import { UpdaterCard } from "./UpdaterCard";
+import { fleet, fleetEnabled } from "../fleet";
 
 const createElement = (type, props, key) =>
   React.createElement(type, key === undefined ? props : { ...props, key });
 
-function SettingToggle({ on, set, label, note, icon }) {
+function SettingToggle({ on, set, label, note, icon, disabled, describedBy }) {
   return createElement("button", {
     className: "setting-row",
     role: "switch",
     "aria-checked": on,
+    "aria-describedby": describedBy,
+    disabled,
     onClick: (e) => set(!on, e.currentTarget),
     children: [
       createElement("span", {
@@ -31,6 +34,75 @@ function SettingToggle({ on, set, label, note, icon }) {
           children: createElement("u", {}),
         }),
       }),
+    ],
+  });
+}
+// More > Qubit: how Qubit answers (Scott, 2026-10-01). Lives on the gateway, not in this app, so it
+// is the same on every device; only a hub admin can change it.
+function QubitSettings({ active }) {
+  let [st, setSt] = useState(null),
+    [err, setErr] = useState(""),
+    [saving, setSaving] = useState(false),
+    // Bumped by every change: a slower GET that started earlier must not overwrite it (review).
+    gen = React.useRef(0);
+  useEffect(() => {
+    if (!active || !fleetEnabled()) return undefined;
+    let alive = true,
+      mine = gen.current;
+    fleet
+      .qubitSettings()
+      .then((r) => alive && gen.current === mine && setSt(r))
+      .catch(() => {});          // off the tailnet: no section, rather than an alert on every visit
+    return () => {
+      alive = false;
+    };
+  }, [active]);
+  if (!fleetEnabled() || !st) return null;
+  let change = async (key, value) => {
+    let was = st[key];
+    gen.current += 1;
+    setSt((s) => ({ ...s, [key]: value }));
+    setErr("");
+    setSaving(true);
+    try {
+      let r = await fleet.setQubitSettings({ [key]: value });
+      setSt(r);
+    } catch (e) {
+      setSt((s) => ({ ...s, [key]: was }));   // only the one that failed
+      setErr(e.status === 403 ? "Only a hub admin can change this." : "That didn't save. Try again.");
+    }
+    setSaving(false);
+  };
+  let locked = !st.can_change || saving;
+  return createElement(React.Fragment, {
+    children: [
+      createElement("h3", { className: "section-label", children: "Qubit" }),
+      createElement("div", {
+        className: "settings-card",
+        children: [
+          createElement(SettingToggle, {
+            on: Boolean(st.front_desk),
+            set: (v) => change("front_desk", v),
+            label: "Front desk",
+            note: "Quick replies right away; bigger asks go to Qubit's full brain",
+            icon: "agent",
+            disabled: locked,
+            describedBy: st.can_change ? undefined : "qubit-settings-note",
+          }),
+          createElement(SettingToggle, {
+            on: Boolean(st.cloud_agents_first),
+            set: (v) => change("cloud_agents_first", v),
+            label: "Use cloud agents first",
+            note: "Helpers try Gemini first (free, rate-limited), then local",
+            icon: "cloud",
+            disabled: locked,
+            describedBy: st.can_change ? undefined : "qubit-settings-note",
+          }),
+        ],
+      }),
+      !st.can_change &&
+        createElement("p", { id: "qubit-settings-note", className: "settings-note", children: "Only a hub admin can change these." }),
+      err && createElement("p", { className: "settings-error", role: "alert", children: err }),
     ],
   });
 }
@@ -173,7 +245,7 @@ function GoalsScreen({ active, start }) {
       createElement("button", {
         className: "primary-button goal-action",
         onClick: start,
-        children: "Plan a next step with Sol",
+        children: "Plan a next step with Qubit",
       }),
     ],
   });
@@ -182,6 +254,8 @@ function SettingsScreen({
   active,
   streaming,
   setStreaming,
+  collapseLong,
+  setCollapseLong,
   haptics,
   setHaptics,
   theme,
@@ -219,6 +293,13 @@ function SettingsScreen({
             icon: "spark",
           }),
           createElement(SettingToggle, {
+            on: collapseLong,
+            set: setCollapseLong,
+            label: "Collapse long messages",
+            note: "Fold long replies behind Read more",
+            icon: "collapse",
+          }),
+          createElement(SettingToggle, {
             on: haptics,
             set: setHaptics,
             label: "Haptics",
@@ -227,6 +308,7 @@ function SettingsScreen({
           }),
         ],
       }),
+      createElement(QubitSettings, { active }),
       createElement("h3", {
         className: "section-label",
         children: "Appearance",
@@ -298,7 +380,7 @@ function SettingsScreen({
               createElement("span", {
                 children: [
                   createElement("b", { children: "Skills" }),
-                  createElement("small", { children: "Enable tools for Sol" }),
+                  createElement("small", { children: "Enable tools for Qubit" }),
                 ],
               }),
               createElement("em", { "aria-hidden": "true", children: "›" }),

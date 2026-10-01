@@ -1,3 +1,7 @@
+// The one assistant in the chat window is Qubit (Scott, 2026-10-01: "Sol isn't an agent that we
+// should use. It should be Qubit."). Sol is the app.
+export const ASSISTANT = Object.freeze({ name: "Qubit", initials: "Q", color: "#68b7ff" });
+
 var nowIso = () => new Date().toISOString();
 var storage = (() => {
   let memory = new Map();
@@ -80,7 +84,7 @@ var initialMessages = [
   {
     id: "a4",
     role: "user",
-    text: "That’s exactly the kind of help I want from Sol.",
+    text: "That’s exactly the kind of help I want from Qubit.",
     at: atOffset(-1),
     status: "delivered",
   },
@@ -93,7 +97,7 @@ var initialThreads = [
     preview: "Tell me the projects, and I’ll structure…",
     time: "Today",
     group: "Today",
-    participants: [{ name: "Sol", initials: "S", color: "#f5b34f" }],
+    participants: [ASSISTANT],
     messages: initialMessages,
   },
   {
@@ -104,7 +108,7 @@ var initialThreads = [
     time: "Today",
     group: "Today",
     participants: [
-      { name: "Sol", initials: "S", color: "#f5b34f" },
+      ASSISTANT,
       { name: "Ava Chen", initials: "AC", color: "#68b7ff" },
       { name: "Marcus Webb", initials: "MW", color: "#63d6a2" },
     ],
@@ -140,9 +144,8 @@ var initialThreads = [
     time: "Today",
     group: "Today",
     participants: [
-      { name: "Qubit", initials: "Q", color: "#68b7ff" },
+      ASSISTANT,
       { name: "Ion", initials: "I", color: "#9d8cff" },
-      { name: "Sol", initials: "S", color: "#f5b34f" },
     ],
     messages: [
       {
