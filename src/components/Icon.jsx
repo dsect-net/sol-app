@@ -3,7 +3,7 @@ import {
   BookOpen, Bot, Camera, Check, ChevronLeft, ChevronRight, Copy, Download, Ellipsis, File, Flag,
   Folder, Forward, Image, Info, Lightbulb, ListChecks, Menu, MessageCircle, Mic, Monitor, Moon,
   Pause, PenLine, Pin, Play, Plug, Plus, Reply, Search, Send, Settings, Share, Sparkles, SquarePen,
-  Star, Sun, Trash2, TriangleAlert, Users, Video, Wrench, X,
+  Star, Sun, Trash2, TriangleAlert, Users, Video, Wrench, X, Link,
 } from "lucide-react";
 
 const createElement = (type, props, key) =>
@@ -26,17 +26,21 @@ const ICONS = {
   photo: Image, image: Image, camera: Camera, video: Video, file: File, codex: BookOpen,
   plug: Plug, skill: Wrench, spark: Sparkles, pin: Pin, download: Download, check: Check,
   forward: Forward, share: Share, select: ListChecks, details: Info, alert: TriangleAlert,
-  play: Play, pause: Pause,
+  play: Play, pause: Pause, link: Link,
 };
+// Icons whose filled form muddles (Users' overlapping figures): active = a heavier stroke instead
+const NO_FILL = new Set(["agents", "users"]);
 
 const Icon = ({ name: l, size: t = 22 }) => {
   let filled = l.endsWith("Filled"),
-    Glyph = ICONS[filled ? l.slice(0, -6) : l] || MessageCircle;
+    base = filled ? l.slice(0, -6) : l,
+    Glyph = ICONS[base] || MessageCircle,
+    solid = filled && !NO_FILL.has(base);
   return createElement(Glyph, {
     size: t,
-    strokeWidth: 1.5,
+    strokeWidth: filled && !solid ? 2.25 : 1.5,
     absoluteStrokeWidth: false,
-    fill: filled ? "currentColor" : "none",
+    fill: solid ? "currentColor" : "none",
     "aria-hidden": "true",
     focusable: "false",
   });

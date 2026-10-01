@@ -1152,6 +1152,12 @@ function SolApp() {
   };
   // Real backend round trip. Demo mode keeps the canned path in send().
   let backendSend = async ({ prompt, threadId, cfg, history, retryOf = null, noOverride = false }) => {
+    // One request at a time: a second send while waiting used to stack requests (both replies
+    // landed, and a third hit the gateway's 429 busy_caller). Stop the earlier one first.
+    if (backendAbort.current) {
+      backendAbort.current.abort();
+      backendAbort.current = null;
+    }
     // The thread's own model, if one was picked. `baseCfg` (the saved default) is what gets marked
     // verified: verifying the override made Settings show the default as untested (review).
     let baseCfg = cfg,
@@ -1223,6 +1229,9 @@ function SolApp() {
           model: cfg.model,
           apiKey: cfg.apiKey,
           gateway: isGatewayUrl(cfg.baseUrl),
+          // The gateway and nginx allow 10 minutes; a whole reply from the 35B can need more
+          // than the 2-minute default before anything at all comes back
+          timeoutMs: isGatewayUrl(cfg.baseUrl) ? 600000 : undefined,
           messages: history,
           stream: true,
           signal: controller.signal,
@@ -1256,6 +1265,9 @@ function SolApp() {
           model: cfg.model,
           apiKey: cfg.apiKey,
           gateway: isGatewayUrl(cfg.baseUrl),
+          // The gateway and nginx allow 10 minutes; a whole reply from the 35B can need more
+          // than the 2-minute default before anything at all comes back
+          timeoutMs: isGatewayUrl(cfg.baseUrl) ? 600000 : undefined,
           messages: history,
           stream: false,
           signal: controller.signal,
@@ -2876,7 +2888,9 @@ function SolApp() {
                   ),
                 ),
               }),
-            streaming &&
+            // Also while waiting on a whole (non-streamed) reply - the default since streaming went
+            // off - or a long answer from the 35B could not be stopped at all (review, PR #12)
+            (streaming || (typing && backendAbort.current)) &&
               createElement("button", {
                 className: "stop-button",
                 onClick: (e) => stopStream(e.currentTarget),

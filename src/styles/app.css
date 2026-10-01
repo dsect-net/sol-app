@@ -201,15 +201,7 @@ svg {
   align-items: center;
   gap: 7px;
 }
-.prototype-tag {
-  padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  color: var(--muted);
-  font-size: 8px;
-  font-weight: 850;
-  letter-spacing: 0.1em;
-}
+
 .screens {
   min-height: 0;
   position: relative;
@@ -609,12 +601,7 @@ svg {
 .content-screen {
   padding: 22px 17px 32px;
 }
-.intro h2 {
-  margin: 0 0 6px;
-  font-size: 26px;
-  letter-spacing: -0.04em;
-}
-.intro p,
+
 .empty-state p {
   margin: 0;
   color: var(--muted);
@@ -1352,9 +1339,7 @@ svg {
   }
 }
 @media (max-width: 380px) {
-  .prototype-tag {
-    display: none;
-  }
+
   .app-header {
     padding-left: 9px;
     padding-right: 9px;
@@ -2213,27 +2198,7 @@ button:active {
   height: 6px;
   background: var(--success);
 }
-.prototype-tag {
-  min-height: 22px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--brand-subtle);
-  color: var(--brand-strong);
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-.prototype-tag:before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-}
+
 .round-button,
 .drawer-close,
 .dialog-head button,
@@ -2371,12 +2336,7 @@ button:active {
 .content-screen {
   padding: var(--space-6) var(--space-4) var(--space-8);
 }
-.intro h2 {
-  font-size: 24px;
-  font-weight: 750;
-  letter-spacing: -0.035em;
-}
-.intro p,
+
 .empty-state p {
   color: var(--text-secondary);
   font-size: 14px;
@@ -2429,6 +2389,9 @@ button:active {
   width: 48px;
   height: 48px;
   color: var(--faint);
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 .sun-mark {
   width: 64px;
@@ -2871,9 +2834,7 @@ button:active {
   }
 }
 @media (max-width: 390px) {
-  .prototype-tag {
-    display: none;
-  }
+
   .app-header {
     padding-left: var(--space-2);
     padding-right: var(--space-2);
@@ -2986,18 +2947,7 @@ button:active {
   text-align: left;
   animation: typing-ellipsis 1.2s steps(4, end) infinite;
 }
-.title-line .prototype-tag {
-  min-height: 15px;
-  padding: 1px 5px;
-  background: var(--brand-subtle);
-  font-size: 6px;
-  letter-spacing: 0.09em;
-  opacity: 0.78;
-}
-.title-line .prototype-tag:before {
-  width: 3px;
-  height: 3px;
-}
+
 .header-actions {
   gap: 8px;
 }
@@ -3212,9 +3162,7 @@ html[data-drawer-dragging] .tabbar {
   .title-line {
     gap: 4px;
   }
-  .title-line .prototype-tag {
-    padding-inline: 4px;
-  }
+
 }
 @media (prefers-reduced-motion: reduce) {
   .drawer-layer.open .drawer,
@@ -3299,10 +3247,6 @@ html[data-drawer-dragging] .tabbar {
 .quick-replies button:disabled {
   opacity: 0.45;
 }
-
-
-
-
 
 /* Compact error banner rendered beneath a failed message. */
 .error-banner {
@@ -3402,9 +3346,7 @@ html[data-drawer-dragging] .tabbar {
   font-size: 12px;
   line-height: 16px;
 }
-.title-line .prototype-tag {
-  opacity: 0.64;
-}
+
 .header-actions {
   gap: 0;
 }
@@ -3469,10 +3411,7 @@ html[data-drawer-dragging] .tabbar {
   .identity .status {
     font-size: 11px;
   }
-  .title-line .prototype-tag {
-    font-size: 5px;
-    padding-inline: 3px;
-  }
+
   .new-chat-pill {
     height: 40px;
     min-height: 40px;
@@ -4697,7 +4636,6 @@ html:not([data-theme="light"]) .image-bubble span {
   }
 }
 
-
 /* 2026-09-25 interaction and collaboration pass. */
 :root {
   --user-bubble: #87c9ff;
@@ -5019,7 +4957,6 @@ html:not([data-theme="light"]) .user .audio-times {
   background: var(--raised);
   color: var(--text);
 }
-
 
 /* Agents: the fleet roster, the shared desk, handoffs. Uses the semantic tokens above; state is
    always a dot AND a word, never colour alone. */
