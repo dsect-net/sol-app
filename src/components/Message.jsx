@@ -414,7 +414,7 @@ function Message({
       showSender && message.role === "assistant" && !groupedTop &&
         createElement("span", {
           className: "message-sender",
-          children: message.sender || "Sol",
+          children: message.sender || "Qubit",
         }),
       createElement("div", {
         className: "bubble-wrap",

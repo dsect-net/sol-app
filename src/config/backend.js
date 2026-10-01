@@ -28,7 +28,15 @@ export const RECOMMENDED_BACKEND = Object.freeze({
 // can reach it: an HTTPS page (team.dsect.net, or the APK at https://localhost) cannot fetch the
 // plain-http llama-server address above - browsers and WebViews block mixed content, and Android
 // blocks cleartext - and one llama-server URL only ever offers one model.
-export const GATEWAY_DEFAULT_MODEL = "Qwen3-4B-Instruct-2507";
+//
+// The default is Qubit itself (Scott, 2026-10-01: the main chat is Qubit, not a bare model). The
+// gateway's "qubit" goes through Qubit's front desk - quick replies from the fast model on the RTX,
+// everything else from the real Qubit (Hermes) - and is offered to people only, not tagged devices.
+export const QUBIT_MODEL = "qubit";
+export const GATEWAY_DEFAULT_MODEL = QUBIT_MODEL;
+// What autoConnect saved as the default before Qubit was. A saved default that is still this was
+// never chosen by anyone, so it moves to Qubit once (a chat set to a model keeps it).
+const OLD_GATEWAY_DEFAULT = "Qwen3-4B-Instruct-2507";
 
 export function gatewayBase() {
   let base = solApiBase();
@@ -140,7 +148,14 @@ export async function autoConnect({ timeoutMs = 6000 } = {}) {
   let gw = gatewayBase();
   if (!gw) return null;
   let current = getBackendConfig();
-  if (isGatewayUrl(current.baseUrl)) return null;                 // already on it
+  if (isGatewayUrl(current.baseUrl)) {
+    if (current.model !== OLD_GATEWAY_DEFAULT || storage.get("qubitDefault", false)) return null;  // already on it
+    storage.set("qubitDefault", true);
+    let next = { ...current, model: QUBIT_MODEL };
+    saveBackendConfig(next);
+    saveBackendVerified(next);
+    return getBackendConfig();
+  }
   if (!isDemoMode(current) && !unreachableFromHere(current.baseUrl)) return null;   // a working choice
   let ctrl = new AbortController();
   let timer = setTimeout(() => ctrl.abort(), timeoutMs);

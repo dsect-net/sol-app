@@ -245,7 +245,7 @@ function GoalsScreen({ active, start }) {
       createElement("button", {
         className: "primary-button goal-action",
         onClick: start,
-        children: "Plan a next step with Sol",
+        children: "Plan a next step with Qubit",
       }),
     ],
   });

@@ -17,6 +17,7 @@ const LANE = {
   balanced: "Balanced",
   deep: "Deep",
   cpu: "Backup",
+  agent: "Agent",
 };
 
 export function laneLabel(m) {
