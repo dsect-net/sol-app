@@ -52,6 +52,7 @@ import { ModelSheet, laneLabel, useLocalModels } from "./components/ModelPicker"
 import { sendChatCompletion, fetchModels, testConnection } from "./api/chat";
 import { AgentSheet, AgentsScreen, HandoffBanner, useFleet } from "./components/Agents";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { SolEdge } from "sol-edge";
 
 const createElement = (type, props, key) =>
   React.createElement(type, key === undefined ? props : { ...props, key });
@@ -868,6 +869,12 @@ function SolApp() {
   };
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    // Edge-to-edge on Android: the status and gesture bars sit over Sol's own colours, so their
+    // icons follow the theme (plugins/sol-edge). A no-op in a browser.
+    if (window.Capacitor?.isNativePlatform?.()) {
+      SolEdge.setBarStyle({ dark: theme === "dark" }).catch(() => {});
+      SolEdge.getInsets().catch(() => {});
+    }
     storage.set("theme", theme);
     let meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = theme === "light" ? "#f1f1f4" : "#131315";
