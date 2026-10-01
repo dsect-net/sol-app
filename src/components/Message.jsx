@@ -372,17 +372,13 @@ function Message({
   retryDemo,
   showSender,
 }) {
-  let [expanded, setExpanded] = useState(false),
-    rowClass =
+  let rowClass =
       "message-row " +
       message.role +
       " entering " +
       (groupedTop ? "grouped-top " : "") +
       (groupedBottom ? "grouped-bottom " : "") +
-      (message.deleting ? "deleting" : ""),
-    isLong =
-      (message.text || "").length > 430 ||
-      (message.text || "").split("\n").length > 7;
+      (message.deleting ? "deleting" : "");
   if (message.role === "system")
     return createElement("div", {
       className: rowClass,
@@ -453,8 +449,7 @@ function Message({
                   className:
                     "bubble " +
                     (message.role === "user" ? "sent-pop " : "") +
-                    (message.thinking ? "thinking-demo " : "") +
-                    (isLong && !expanded ? "is-collapsed" : ""),
+                    (message.thinking ? "thinking-demo " : ""),
                   onPointerDown: (e) => begin(e, message),
                   onPointerMove: (e) => move(e, message),
                   onPointerUp: (e) => end(e, message),
@@ -487,16 +482,6 @@ function Message({
                         className: "cursor",
                         "aria-hidden": "true",
                         children: "▍",
-                      }),
-                    isLong &&
-                      createElement("button", {
-                        className: "read-toggle",
-                        onPointerDown: (e) => e.stopPropagation(),
-                        onClick: (e) => {
-                          e.stopPropagation();
-                          setExpanded((x) => !x);
-                        },
-                        children: expanded ? "Show less" : "Read more",
                       }),
                   ],
                 }),

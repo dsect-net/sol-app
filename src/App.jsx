@@ -65,8 +65,11 @@ function SolApp() {
     [drawerSearch, setDrawerSearch] = useState(""),
     [draft, setDraft] = useState(""),
     [typing, setTyping] = useState(false),
+    // Off by default (Scott, 2026-10-01): the typing bubble, then the whole reply at once. A new
+    // key on purpose: the old "streaming" was written on every launch, so every install already
+    // has true saved and a changed default would never reach it. More > Streaming turns it on.
     [streamingEnabled, setStreamingEnabled] = useState(() =>
-      storage.get("streaming", true),
+      storage.get("streamReplies", false),
     ),
     [streaming, setStreaming] = useState(false),
     [haptics, setHaptics] = useState(() => storage.get("haptics", true)),
@@ -896,7 +899,7 @@ function SolApp() {
     if (meta) meta.content = theme === "light" ? "#f1f1f4" : "#131315";
   }, [theme]);
   useEffect(() => {
-    storage.set("streaming", streamingEnabled);
+    storage.set("streamReplies", streamingEnabled);
   }, [streamingEnabled]);
   useEffect(() => {
     saveBackendConfig(config);
@@ -1149,6 +1152,12 @@ function SolApp() {
   };
   // Real backend round trip. Demo mode keeps the canned path in send().
   let backendSend = async ({ prompt, threadId, cfg, history, retryOf = null, noOverride = false }) => {
+    // One request at a time: a second send while waiting used to stack requests (both replies
+    // landed, and a third hit the gateway's 429 busy_caller). Stop the earlier one first.
+    if (backendAbort.current) {
+      backendAbort.current.abort();
+      backendAbort.current = null;
+    }
     // The thread's own model, if one was picked. `baseCfg` (the saved default) is what gets marked
     // verified: verifying the override made Settings show the default as untested (review).
     let baseCfg = cfg,
@@ -1220,6 +1229,9 @@ function SolApp() {
           model: cfg.model,
           apiKey: cfg.apiKey,
           gateway: isGatewayUrl(cfg.baseUrl),
+          // The gateway and nginx allow 10 minutes; a whole reply from the 35B can need more
+          // than the 2-minute default before anything at all comes back
+          timeoutMs: isGatewayUrl(cfg.baseUrl) ? 600000 : undefined,
           messages: history,
           stream: true,
           signal: controller.signal,
@@ -1253,6 +1265,9 @@ function SolApp() {
           model: cfg.model,
           apiKey: cfg.apiKey,
           gateway: isGatewayUrl(cfg.baseUrl),
+          // The gateway and nginx allow 10 minutes; a whole reply from the 35B can need more
+          // than the 2-minute default before anything at all comes back
+          timeoutMs: isGatewayUrl(cfg.baseUrl) ? 600000 : undefined,
           messages: history,
           stream: false,
           signal: controller.signal,
@@ -1945,7 +1960,7 @@ function SolApp() {
     haptic("light");
   };
   let demoHelp =
-    "Prototype demos:\n#thinking — thinking phases\n#typing — typing indicator\n#stream — forced streaming\n#image — image generation flow\n#code — syntax-highlighted code block\n#input — quick replies\n#reactions — reaction stack\n#reply — quoted reply\n#voice — playable voice bubble\n#link — rich link preview\n#error — retryable error\n#system — system row\n#long — collapsed long message\n#help — this list";
+    "Prototype demos:\n#thinking — thinking phases\n#typing — typing indicator\n#stream — forced streaming\n#image — image generation flow\n#code — syntax-highlighted code block\n#input — quick replies\n#reactions — reaction stack\n#reply — quoted reply\n#voice — playable voice bubble\n#link — rich link preview\n#error — retryable error\n#system — system row\n#long — long message\n#help — this list";
   let executeDemo = (raw) => {
     let name = (raw.trim().match(/^#\S+/) || ["#help"])[0].toLowerCase();
     setDraft("");
@@ -2407,10 +2422,6 @@ function SolApp() {
                                     ? activeThread.title
                                     : "Sol",
                               }),
-                              createElement("span", {
-                                className: "prototype-tag",
-                                children: "PROTOTYPE",
-                              }),
                             ],
                           }),
                           // On the gateway, a one-to-one chat shows WHICH local model is
@@ -2486,10 +2497,6 @@ function SolApp() {
                   })
                 : createElement(Fragment, {
                     children: [
-                      createElement("span", {
-                        className: "prototype-tag",
-                        children: "PROTOTYPE",
-                      }),
                       createElement(ButtonUtility, {
                         className: "round-button",
                         label:
@@ -2881,7 +2888,9 @@ function SolApp() {
                   ),
                 ),
               }),
-            streaming &&
+            // Also while waiting on a whole (non-streamed) reply - the default since streaming went
+            // off - or a long answer from the 35B could not be stopped at all (review, PR #12)
+            (streaming || (typing && backendAbort.current)) &&
               createElement("button", {
                 className: "stop-button",
                 onClick: (e) => stopStream(e.currentTarget),

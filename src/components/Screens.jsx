@@ -39,15 +39,6 @@ function LibraryScreen({ active, threads, choose }) {
     className: "screen content-screen " + (active ? "active" : ""),
     children: [
       createElement("div", {
-        className: "intro",
-        children: [
-          createElement("h2", { children: "Recent conversations" }),
-          createElement("p", {
-            children: "Pick up where you left off with Sol.",
-          }),
-        ],
-      }),
-      createElement("div", {
         className: "card-stack",
         children: threads
           .slice(0, 6)
@@ -82,15 +73,6 @@ function IdeasScreen({ active, ideas, draft, setDraft, add, inputRef }) {
   return createElement("section", {
     className: "screen content-screen " + (active ? "active" : ""),
     children: [
-      createElement("div", {
-        className: "intro",
-        children: [
-          createElement("h2", { children: "Capture a spark" }),
-          createElement("p", {
-            children: "Keep a thought nearby while this prototype is open.",
-          }),
-        ],
-      }),
       createElement("form", {
         className: "idea-composer",
         onSubmit: (e) => {
@@ -154,16 +136,6 @@ function GoalsScreen({ active, start }) {
   return createElement("section", {
     className: "screen content-screen " + (active ? "active" : ""),
     children: [
-      createElement("div", {
-        className: "intro",
-        children: [
-          createElement("h2", { children: "What you’re moving toward" }),
-          createElement("p", {
-            children:
-              "Clear next steps, kept close to the conversations that shaped them.",
-          }),
-        ],
-      }),
       createElement("h3", {
         className: "section-label",
         children: "In progress",

@@ -240,17 +240,6 @@ export function AgentsScreen({ active, fleetState, open }) {
     className: "screen content-screen agents-screen " + (active ? "active" : ""),
     "aria-label": "Agents",
     children: [
-      createElement("div", {
-        className: "intro",
-        children: [
-          createElement("h2", { children: "Agents" }),
-          createElement("p", {
-            children: me?.name
-              ? `Your fleet, ${me.name}. Tap an agent to watch its desk or message it.`
-              : "Your fleet and the desk they share.",
-          }),
-        ],
-      }),
       body,
     ],
   });
