@@ -319,34 +319,67 @@ function DmThread({ agent, me }) {
     [sending, setSending] = useState(false),
     [error, setError] = useState(""),
     [loaded, setLoaded] = useState(false),
+    // The gateway's answer state for this DM: {pending, seconds, error}. Agents with
+    // instant_replies are answered by the REAL agent through its Hermes API (sol_gateway.py);
+    // the others are never imitated, and the thread says when they will see it.
+    [answer, setAnswer] = useState(null),
+    [instant, setInstant] = useState(Boolean(agent.instant_replies)),
     lastId = useRef(0),
-    list = useRef(null);
+    list = useRef(null),
+    // poll() reschedules the next check now: after a send, the faster polling starts at once
+    // instead of up to 3 s later (review).
+    poll = useRef(() => {});
+
+  // A poll in flight and a send can both bring back the same message; keep one (review).
+  let append = (incoming) =>
+    setMessages((m) => {
+      let seen = new Set(m.map((x) => x.id));
+      return [...m, ...incoming.filter((x) => !seen.has(x.id))];
+    });
 
   useEffect(() => {
     let alive = true,
-      timer;
+      timer,
+      inFlight = false,
+      pending = false;
     lastId.current = 0;
+    setAnswer(null);
     setMessages([]);
     setLoaded(false);
     let tick = async () => {
+      inFlight = true;
       try {
         let r = await fleet.dm(agent.id, lastId.current);
         if (!alive) return;
         if (r.messages.length) {
-          lastId.current = r.messages[r.messages.length - 1].id;
-          setMessages((m) => [...m, ...r.messages]);
+          lastId.current = Math.max(lastId.current, r.messages[r.messages.length - 1].id);
+          append(r.messages);
         }
+        setAnswer(r.answer || null);
+        if (typeof r.instant_replies === "boolean") setInstant(r.instant_replies);
         setError("");
         setLoaded(true);
+        pending = Boolean(r.answer && r.answer.pending);
       } catch {
         if (alive) setError("Messages didn't load. Sol retries every few seconds.");
       }
-      if (alive) timer = setTimeout(tick, 3000);
+      inFlight = false;
+      // Faster while the agent is working on a reply, so it shows up when it lands
+      if (alive) timer = setTimeout(tick, pending ? 1500 : 3000);
+    };
+    poll.current = () => {
+      pending = true;
+      // A poll on the wire reschedules itself when it lands; starting another here would leave
+      // two loops running (review).
+      if (inFlight || !alive) return;
+      clearTimeout(timer);
+      timer = setTimeout(tick, 1500);
     };
     tick();
     return () => {
       alive = false;
       clearTimeout(timer);
+      poll.current = () => {};
     };
   }, [agent.id]);
 
@@ -363,10 +396,9 @@ function DmThread({ agent, me }) {
     try {
       let r = await fleet.sendDm(agent.id, text);
       setDraft("");
-      if (r.message && r.message.id > lastId.current) {
-        lastId.current = r.message.id;
-        setMessages((m) => [...m, r.message]);
-      }
+      if (r.answer) setAnswer(r.answer);
+      if (r.message) append([r.message]);
+      if (r.answer && r.answer.pending) poll.current();
     } catch {
       setError("Couldn't send. Your message is still here; try again.");
     }
@@ -397,9 +429,25 @@ function DmThread({ agent, me }) {
             )
           : createElement("p", {
               className: "dm-empty",
-              children: `No messages with ${agent.name} yet. They read the relay; replies land here.`,
+              children: instant
+                ? `No messages with ${agent.name} yet. ${agent.name} answers here, usually within a minute.`
+                : `No messages with ${agent.name} yet. ${agent.name} reads DMs when they next check in; replies land here.`,
             }),
       }),
+      answer && answer.pending &&
+        createElement("p", {
+          className: "dm-thinking",
+          role: "status",
+          children: [
+            createElement("span", { className: "dm-dots", "aria-hidden": "true", children: [createElement("i", {}, 1), createElement("i", {}, 2), createElement("i", {}, 3)] }),
+            `${agent.name} is thinking`,
+            // A real agent turn can take a minute or more; say so rather than look frozen. Shown,
+            // not announced: a live region would re-read it on every poll (review).
+            answer.seconds >= 20 && createElement("span", { "aria-hidden": "true", children: ` · ${answer.seconds}s` }),
+          ],
+        }),
+      answer && !answer.pending && answer.error &&
+        createElement("p", { className: "dm-error", role: "alert", children: answer.error }),
       error && createElement("p", { className: "dm-error", role: "alert", children: error }),
       createElement("form", {
         className: "dm-composer",
@@ -408,7 +456,7 @@ function DmThread({ agent, me }) {
           createElement("input", {
             value: draft,
             onChange: (e) => setDraft(e.target.value),
-            placeholder: `Message ${agent.name}`,
+            placeholder: instant ? `Message ${agent.name}` : `Message ${agent.name} (replies when they check in)`,
             "aria-label": `Message ${agent.name}`,
             maxLength: 2000,
           }),
@@ -560,7 +608,8 @@ export function AgentSheet({ agentId, fleetState, close }) {
           deskActions,
           err && createElement("p", { className: "dm-error", role: "alert", children: err }),
           createElement("h3", { className: "sheet-section", children: "Messages" }),
-          createElement(DmThread, { agent, me }),
+          // Keyed by agent: a reply still in flight for one agent must not land in another's thread (review).
+          createElement(DmThread, { agent, me }, agent.id),
         ],
       }),
     ],
