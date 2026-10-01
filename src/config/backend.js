@@ -148,9 +148,12 @@ export async function autoConnect({ timeoutMs = 6000 } = {}) {
   let gw = gatewayBase();
   if (!gw) return null;
   let current = getBackendConfig();
+  // Decided once per install, the first time a gateway is seen: after that, a Qwen 4B default is
+  // someone's choice and stays (review).
+  let migrate = !storage.get("qubitDefault", false);
+  storage.set("qubitDefault", true);
   if (isGatewayUrl(current.baseUrl)) {
-    if (current.model !== OLD_GATEWAY_DEFAULT || storage.get("qubitDefault", false)) return null;  // already on it
-    storage.set("qubitDefault", true);
+    if (!migrate || current.model !== OLD_GATEWAY_DEFAULT) return null;  // already on it
     let next = { ...current, model: QUBIT_MODEL };
     saveBackendConfig(next);
     saveBackendVerified(next);

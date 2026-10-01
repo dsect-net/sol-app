@@ -197,7 +197,8 @@ function SolApp() {
     // Who is answering in a one-to-one chat. Qubit, unless this chat was pointed at a bare local
     // model on the gateway: then it's that model, by name - never a model calling itself Qubit.
     assistantName = (threadId) => {
-      let id = viaGateway ? modelFor(threadId) : "";
+      // Demo mode is Qubit's demo; any real backend that isn't Qubit answers under its own name.
+      let id = isDemoMode(config) ? "" : viaGateway ? modelFor(threadId) : config.model;
       if (!id || id === QUBIT_MODEL) return ASSISTANT.name;
       let m = modelInfo(id);
       return (m && m.label) || id;

@@ -144,9 +144,8 @@ var initialThreads = [
     time: "Today",
     group: "Today",
     participants: [
-      { name: "Qubit", initials: "Q", color: "#68b7ff" },
-      { name: "Ion", initials: "I", color: "#9d8cff" },
       ASSISTANT,
+      { name: "Ion", initials: "I", color: "#9d8cff" },
     ],
     messages: [
       {

@@ -380,7 +380,7 @@ function SettingsScreen({
               createElement("span", {
                 children: [
                   createElement("b", { children: "Skills" }),
-                  createElement("small", { children: "Enable tools for Sol" }),
+                  createElement("small", { children: "Enable tools for Qubit" }),
                 ],
               }),
               createElement("em", { "aria-hidden": "true", children: "›" }),
