@@ -284,10 +284,14 @@ export async function pollHistory({
         // Transient failure while polling: keep waiting until the cap.
         await new Promise((resolve, reject) => {
           let timer = setTimeout(resolve, intervalMs);
-          combined.signal.addEventListener("abort", () => {
-            clearTimeout(timer);
-            reject(combined.signal.reason);
-          });
+          combined.signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              reject(combined.signal.reason);
+            },
+            { once: true },
+          );
         });
         continue;
       }
@@ -320,10 +324,14 @@ export async function pollHistory({
       }
       await new Promise((resolve, reject) => {
         let timer = setTimeout(resolve, intervalMs);
-        combined.signal.addEventListener("abort", () => {
-          clearTimeout(timer);
-          reject(new ComfyApiError("aborted", "The request was stopped."));
-        });
+        combined.signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new ComfyApiError("aborted", "The request was stopped."));
+          },
+          { once: true },
+        );
       });
     }
   } finally {
@@ -377,6 +385,7 @@ export async function generateComfyImage({
   seed = null,
   onProgress = null,
   signal = null,
+  intervalMs = POLL_INTERVAL_MS,
 } = {}) {
   let base = normalizeBaseUrl(baseUrl);
   if (!base) throw new ComfyApiError("config", "ComfyUI base URL is empty.");
@@ -395,6 +404,7 @@ export async function generateComfyImage({
     promptId,
     onProgress: (state) => report(state === "done" ? "decoding" : "sampling"),
     signal,
+    intervalMs,
   });
   if (!images.length)
     throw new ComfyApiError(

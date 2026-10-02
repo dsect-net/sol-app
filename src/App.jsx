@@ -1824,7 +1824,7 @@ function SolApp() {
     report(labels[0]);
     setImagePrompt("");
     try {
-      let { blob, filename } = await generateComfyImage({
+      let { blob } = await generateComfyImage({
         baseUrl: comfyConfig.baseUrl,
         model: comfyConfig.model,
         prompt,
