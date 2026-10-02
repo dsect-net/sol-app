@@ -53,6 +53,18 @@ import {
 } from "./config/backend";
 import { ModelSheet, laneLabel, useLocalModels } from "./components/ModelPicker";
 import { sendChatCompletion, fetchModels, testConnection } from "./api/chat";
+import {
+  generateComfyImage,
+  testComfyConnection as testComfyApi,
+} from "./api/comfyui";
+import {
+  getComfyConfig,
+  saveComfyConfig,
+  isComfyUnconfigured,
+  isComfyVerified,
+  saveComfyVerified,
+  RECOMMENDED_COMFYUI,
+} from "./config/comfyui";
 import { AgentSheet, AgentsScreen, HandoffBanner, useFleet } from "./components/Agents";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SolEdge } from "sol-edge";
@@ -85,6 +97,10 @@ function SolApp() {
     [generation, setGeneration] = useState(null),
     [imagePrompt, setImagePrompt] = useState(""),
     [config, setConfig] = useState(() => getBackendConfig()),
+    // ComfyUI image generation settings (src/config/comfyui.js). Empty base
+    // URL means /imagine stays in simulated preview mode.
+    [comfyConfig, setComfyConfig] = useState(() => getComfyConfig()),
+    [comfyTestState, setComfyTestState] = useState({ phase: "idle" }),
     // Per-conversation model, used when the backend is the Sol gateway (where every local
     // model shares one URL). threadId -> model id; a missing entry means the saved default.
     [threadModels, setThreadModels] = useState(() => storage.get("threadModels", {})),
@@ -142,6 +158,7 @@ function SolApp() {
     typingTimer = useRef(null),
     replyTimer = useRef(null),
     generationTimers = useRef([]),
+    comfyAbort = useRef(null),
     mounted = useRef(true),
     activeRef = useRef(activeId),
     stickRef = useRef(true),
@@ -700,6 +717,14 @@ function SolApp() {
     resetBackendDialog();
     haptic("light");
   };
+  let fillRecommendedComfy = () => {
+    setComfyConfig((current) => ({
+      ...current,
+      baseUrl: RECOMMENDED_COMFYUI.baseUrl,
+    }));
+    setComfyTestState({ phase: "idle" });
+    haptic("light");
+  };
   let discoverBackendModels = async () => {
     setDiscoverState({ phase: "loading" });
     setTestState({ phase: "idle" });
@@ -746,6 +771,29 @@ function SolApp() {
       haptic("success");
     } catch (error) {
       setTestState({
+        phase: "error",
+        message: error && error.message ? error.message : "Connection failed.",
+      });
+      haptic("heavy");
+    }
+  };
+  let testComfyConnection = async () => {
+    setComfyTestState({ phase: "testing" });
+    try {
+      let result = await testComfyApi({ baseUrl: comfyConfig.baseUrl });
+      saveComfyVerified(comfyConfig);
+      setComfyTestState({
+        phase: "ok",
+        message:
+          "Connected · ComfyUI " +
+          (result.version ? "v" + result.version : "reachable") +
+          " · " +
+          result.latencyMs +
+          " ms",
+      });
+      haptic("success");
+    } catch (error) {
+      setComfyTestState({
         phase: "error",
         message: error && error.message ? error.message : "Connection failed.",
       });
@@ -941,6 +989,9 @@ function SolApp() {
   useEffect(() => {
     saveBackendConfig(config);
   }, [config]);
+  useEffect(() => {
+    saveComfyConfig(comfyConfig);
+  }, [comfyConfig]);
   useEffect(() => {
     storage.set("haptics", haptics);
   }, [haptics]);
@@ -1752,13 +1803,79 @@ function SolApp() {
       }
       return list.filter((p) => p.id !== id);
     });
-  let generateImage = (promptOverride) => {
-    let prompt = (
-      typeof promptOverride === "string" ? promptOverride : imagePrompt
-    ).trim();
-    if (!prompt) return;
-    closeOverlay(false);
-    setTab("chat");
+  // Real image generation through the configured ComfyUI server. Progress
+  // labels mirror the simulated flow so the generation card UI is unchanged.
+  let generateImageReal = async (prompt) => {
+    let id = "g" + Date.now();
+    generationTimers.current.forEach(clearTimeout);
+    generationTimers.current = [];
+    if (comfyAbort.current) {
+      try {
+        comfyAbort.current.abort();
+      } catch (error) {}
+    }
+    let controller = new AbortController();
+    comfyAbort.current = controller;
+    let labels = ["Sending prompt", "Queued", "Sampling", "Decoding", "Loading image"],
+      report = (label) => {
+        if (mounted.current)
+          setGeneration({ id, step: Math.max(0, labels.indexOf(label)), label });
+      };
+    report(labels[0]);
+    setImagePrompt("");
+    try {
+      let { blob, filename } = await generateComfyImage({
+        baseUrl: comfyConfig.baseUrl,
+        model: comfyConfig.model,
+        prompt,
+        width: comfyConfig.width,
+        height: comfyConfig.height,
+        steps: comfyConfig.steps,
+        signal: controller.signal,
+        onProgress: (step) =>
+          report(
+            {
+              sending: labels[0],
+              queued: labels[1],
+              sampling: labels[2],
+              decoding: labels[3],
+              loading: labels[4],
+            }[step] || labels[2],
+          ),
+      });
+      if (!mounted.current) return;
+      let url = URL.createObjectURL(blob);
+      objectUrls.current.add(url);
+      updateActive((list) => [
+        ...list,
+        {
+          id,
+          role: "assistant",
+          image: url,
+          caption: "Generated with " + comfyConfig.model,
+          at: nowIso(),
+        },
+      ]);
+      setGeneration(null);
+      stickRef.current = true;
+      requestAnimationFrame(() => scrollLatest(true));
+      haptic("success");
+    } catch (error) {
+      if (!mounted.current) return;
+      setGeneration(null);
+      if (error && error.code === "aborted") return; // superseded; stay quiet
+      addSystem(
+        "Couldn't generate the image: " +
+          (error && error.message ? error.message : "Unknown error."),
+      );
+      haptic("heavy");
+    } finally {
+      if (comfyAbort.current === controller) comfyAbort.current = null;
+    }
+  };
+  // Simulated fallback used only while no ComfyUI server is configured.
+  // It says what it is ("Prototype preview — not a real generation").
+  let generateImageSimulated = (prompt) => {
     let id = "g" + Date.now(),
       timers = [];
     setGeneration({ id, step: 0, label: "Queued" });
@@ -1814,6 +1931,18 @@ function SolApp() {
       }, 3900),
     );
     generationTimers.current = timers;
+  };
+  // Dispatcher: real ComfyUI generation when a server is configured, the
+  // honest simulated preview otherwise.
+  let generateImage = (promptOverride) => {
+    let prompt = (
+      typeof promptOverride === "string" ? promptOverride : imagePrompt
+    ).trim();
+    if (!prompt) return;
+    closeOverlay(false);
+    setTab("chat");
+    if (isComfyUnconfigured(comfyConfig)) generateImageSimulated(prompt);
+    else generateImageReal(prompt);
   };
   let createChat = (kind = "dm", confirmation) => {
     finalizeStream(true);
@@ -2130,7 +2259,7 @@ function SolApp() {
     addAssistant("Unknown prototype demo. Try #help.");
   };
   let commandHelp =
-    "Available commands:\n/imagine <prompt> — create a prototype image\n/theme <dark|light> — switch theme\n/stream <on|off> — toggle streaming\n/haptics <on|off> — toggle haptics\n/new — start a new chat\n/clear — clear this thread\n/help — show this list";
+    "Available commands:\n/imagine <prompt> — generate an image with ComfyUI\n/theme <dark|light> — switch theme\n/stream <on|off> — toggle streaming\n/haptics <on|off> — toggle haptics\n/new — start a new chat\n/clear — clear this thread\n/help — show this list";
   let executeCommand = (raw) => {
     let match = raw.trim().match(/^\/(\S+)(?:\s+([\s\S]*))?$/),
       name = match ? "/" + match[1].toLowerCase() : "/",
@@ -2209,7 +2338,11 @@ function SolApp() {
         );
         return;
       }
-      addSystem("Creating a prototype image…");
+      addSystem(
+        isComfyUnconfigured(comfyConfig)
+          ? "Creating a prototype image…"
+          : "Generating an image with ComfyUI…",
+      );
       generateImage(arg);
       return;
     }
@@ -3283,8 +3416,11 @@ function SolApp() {
           children: [
             createElement("p", {
               className: "dialog-note",
-              children:
-                "Prototype only. This creates a local visual preview; it does not contact ComfyUI.",
+              children: isComfyUnconfigured(comfyConfig)
+                ? "Prototype only. This creates a local visual preview; it does not contact ComfyUI. Configure a server for real generations."
+                : "Real generation via ComfyUI (" +
+                  comfyConfig.model +
+                  ").",
             }),
             createElement("textarea", {
               className: "dialog-input",
@@ -3298,7 +3434,166 @@ function SolApp() {
               className: "primary-button",
               disabled: !imagePrompt.trim(),
               onClick: generateImage,
-              children: "Generate preview",
+              children: isComfyUnconfigured(comfyConfig)
+                ? "Generate preview"
+                : "Generate with ComfyUI",
+            }),
+            createElement("button", {
+              className: "secondary-button block",
+              onClick: () => {
+                setComfyTestState({ phase: "idle" });
+                setOverlay({ type: "comfyui" });
+              },
+              children: "Image generation settings",
+            }),
+          ],
+        }),
+      overlay &&
+        overlay.type === "comfyui" &&
+        createElement(Dialog, {
+          title: "Image generation",
+          close: closeOverlay,
+          type: "comfyui",
+          children: [
+            createElement("p", {
+              className:
+                "status-line " +
+                (isComfyUnconfigured(comfyConfig)
+                  ? "demo-status"
+                  : isComfyVerified(comfyConfig)
+                    ? "ok-status"
+                    : ""),
+              children: isComfyUnconfigured(comfyConfig)
+                ? "Simulated previews. Add a ComfyUI server for real generations."
+                : isComfyVerified(comfyConfig)
+                  ? "Connected to ComfyUI."
+                  : "ComfyUI configured — test the connection to verify.",
+            }),
+            createElement("label", {
+              children: [
+                "ComfyUI server URL",
+                createElement("input", {
+                  type: "text",
+                  inputMode: "url",
+                  value: comfyConfig.baseUrl,
+                  onChange: (e) =>
+                    setComfyConfig({ ...comfyConfig, baseUrl: e.target.value }),
+                  placeholder: "https://host:8188",
+                  autoComplete: "off",
+                  autoCapitalize: "off",
+                  autoCorrect: "off",
+                  spellCheck: false,
+                }),
+              ],
+            }),
+            createElement("label", {
+              children: [
+                "Checkpoint model",
+                createElement("input", {
+                  type: "text",
+                  value: comfyConfig.model,
+                  onChange: (e) =>
+                    setComfyConfig({ ...comfyConfig, model: e.target.value }),
+                  placeholder: "DreamShaperXL_Lightning.safetensors",
+                  autoComplete: "off",
+                  autoCapitalize: "off",
+                  autoCorrect: "off",
+                  spellCheck: false,
+                }),
+              ],
+            }),
+            createElement("div", {
+              className: "field-row",
+              children: [
+                createElement("label", {
+                  children: [
+                    "Width",
+                    createElement("input", {
+                      type: "number",
+                      min: 64,
+                      step: 64,
+                      value: comfyConfig.width,
+                      onChange: (e) =>
+                        setComfyConfig({
+                          ...comfyConfig,
+                          width: e.target.value,
+                        }),
+                    }),
+                  ],
+                }),
+                createElement("label", {
+                  children: [
+                    "Height",
+                    createElement("input", {
+                      type: "number",
+                      min: 64,
+                      step: 64,
+                      value: comfyConfig.height,
+                      onChange: (e) =>
+                        setComfyConfig({
+                          ...comfyConfig,
+                          height: e.target.value,
+                        }),
+                    }),
+                  ],
+                }),
+                createElement("label", {
+                  children: [
+                    "Steps",
+                    createElement("input", {
+                      type: "number",
+                      min: 1,
+                      max: 50,
+                      value: comfyConfig.steps,
+                      onChange: (e) =>
+                        setComfyConfig({
+                          ...comfyConfig,
+                          steps: e.target.value,
+                        }),
+                    }),
+                  ],
+                }),
+              ],
+            }),
+            createElement("button", {
+              className: "secondary-button block",
+              onClick: fillRecommendedComfy,
+              children: "Use recommended Tritium settings",
+            }),
+            createElement("p", {
+              className: "dialog-note",
+              children:
+                RECOMMENDED_COMFYUI.label +
+                ": ComfyUI on Scotty's home server over Tailscale. The server needs --enable-cors-header so the app can reach it.",
+            }),
+            createElement("button", {
+              className: "secondary-button block",
+              disabled:
+                comfyTestState.phase === "testing" ||
+                !String(comfyConfig.baseUrl || "").trim(),
+              onClick: testComfyConnection,
+              children:
+                comfyTestState.phase === "testing"
+                  ? "Testing…"
+                  : "Test connection",
+            }),
+            comfyTestState.phase === "error" &&
+              createElement("p", {
+                className: "inline-error",
+                children: comfyTestState.message,
+              }),
+            comfyTestState.phase === "ok" &&
+              createElement("p", {
+                className: "inline-ok",
+                children: comfyTestState.message,
+              }),
+            createElement("button", {
+              className: "primary-button",
+              onClick: () => {
+                closeOverlay();
+                notify("Image generation settings saved");
+              },
+              children: "Save",
             }),
           ],
         }),
