@@ -12,3 +12,7 @@ ios/
 # Local test screenshots (never commit)
 shots/
 .playwright-cli/
+
+# Built APKs are published as GitHub releases by CI; the 4.2MB debug
+# build that lived here was committed by accident (Oct 2) and is dead weight
+apk/
